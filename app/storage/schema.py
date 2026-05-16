@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE TABLE IF NOT EXISTS editorial_sessions (
     user_id INTEGER PRIMARY KEY,
     active_post_id INTEGER,
+    active_channel_slug TEXT,
     mode TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
