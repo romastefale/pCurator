@@ -1,6 +1,7 @@
 from aiogram import Router
 from aiogram.types import Message
 
+from app.access import reject_message_if_not_owner
 from app.settings import get_settings
 from app.storage.events import log_event
 from app.storage.posts import update_post_caption
@@ -19,6 +20,9 @@ async def handle_edit_text(message: Message) -> None:
     post_id, mode = await get_active_post(settings.database_path, message.from_user.id)
 
     if mode != "edit_text" or post_id is None:
+        return
+
+    if await reject_message_if_not_owner(message):
         return
 
     await update_post_caption(settings.database_path, post_id, message.text)
