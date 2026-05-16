@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    bot_token: str
+    openai_key: str | None = None
     owner_id: int
     channel_1_id: int | None = None
     channel_2_id: int | None = None
