@@ -59,3 +59,19 @@ async def get_post(database_path: str, post_id: int) -> dict | None:
         )
         row = await cursor.fetchone()
         return dict(row) if row else None
+
+
+async def list_recent_posts(database_path: str, limit: int = 5) -> list[dict]:
+    async with aiosqlite.connect(database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT id, channel_slug, status, image_url, created_at
+            FROM posts
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
