@@ -10,6 +10,7 @@ from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
 from app.storage.items import save_item
 from app.storage.posts import save_post
+from app.ui import channel_keyboard
 
 router = Router()
 
@@ -79,8 +80,9 @@ async def handle_possible_link(message: Message) -> None:
             f"Fonte: {item.source}\n"
             f"Título: {item.title}\n"
             f"Status: {image_status}\n\n"
-            "Rascunho criado. Próxima etapa: escolha de canal e geração editorial.",
+            "Escolha o canal para continuar.",
             parse_mode="HTML",
+            reply_markup=channel_keyboard(),
         )
         return
 
