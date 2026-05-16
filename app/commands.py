@@ -5,7 +5,7 @@ from aiogram.types import Message
 from app.access import reject_message_if_not_owner
 from app.settings import get_settings
 from app.storage.posts import list_recent_posts
-from app.storage.sources import list_sources
+from app.storage.sources import list_sources, upsert_source
 
 router = Router()
 
@@ -35,6 +35,7 @@ async def help_command(message: Message) -> None:
         "/ps — status técnico\n"
         "/pq — fila editorial\n"
         "/pf — fontes\n"
+        "/pfa Nome | url | escopo | nota — cadastrar fonte\n"
         "/pr — regras aprendidas\n",
         parse_mode="HTML",
     )
@@ -102,3 +103,44 @@ async def sources_command(message: Message) -> None:
         )
 
     await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@router.message(Command("pfa"))
+async def add_source_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    text = message.text or ""
+    raw = text.replace("/pfa", "", 1).strip()
+    parts = [part.strip() for part in raw.split("|")]
+
+    if len(parts) < 1 or not parts[0]:
+        await message.answer(
+            "Formato: <code>/pfa Nome | url | escopo | nota</code>\n"
+            "Exemplo: <code>/pfa G1 | https://g1.globo.com | global | 80</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    name = parts[0]
+    url = parts[1] if len(parts) > 1 and parts[1] else None
+    scope = parts[2] if len(parts) > 2 and parts[2] else "global"
+
+    try:
+        quality_score = int(parts[3]) if len(parts) > 3 and parts[3] else 70
+    except ValueError:
+        quality_score = 70
+
+    quality_score = max(0, min(100, quality_score))
+    settings = get_settings()
+    source_id = await upsert_source(
+        settings.database_path,
+        name=name,
+        url=url,
+        scope=scope,
+        quality_score=quality_score,
+    )
+
+    await message.answer(
+        f"Fonte cadastrada: #{source_id} · {name} · {scope} · {quality_score}"
+    )
