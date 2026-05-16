@@ -46,3 +46,35 @@ async def ignore_channel(callback: CallbackQuery) -> None:
     await callback.answer("Ignorado")
     if callback.message:
         await callback.message.answer("🚫 Rascunho ignorado.")
+
+
+@router.callback_query(F.data == "post:publish")
+async def review_publish(callback: CallbackQuery) -> None:
+    await _log_choice(callback, None, "publish_requested")
+    await callback.answer("Publicação solicitada")
+    if callback.message:
+        await callback.message.answer("✅ Pedido de publicação registrado. A publicação real será conectada na próxima etapa.")
+
+
+@router.callback_query(F.data == "post:edit")
+async def review_edit(callback: CallbackQuery) -> None:
+    await _log_choice(callback, None, "edit_requested")
+    await callback.answer("Edição solicitada")
+    if callback.message:
+        await callback.message.answer("✏️ Envie o novo texto da legenda para substituir o rascunho.")
+
+
+@router.callback_query(F.data == "post:image")
+async def review_image(callback: CallbackQuery) -> None:
+    await _log_choice(callback, None, "image_requested")
+    await callback.answer("Imagem solicitada")
+    if callback.message:
+        await callback.message.answer("🖼 Envie a nova imagem para este rascunho.")
+
+
+@router.callback_query(F.data == "post:ignore")
+async def review_ignore(callback: CallbackQuery) -> None:
+    await _log_choice(callback, None, "post_ignored")
+    await callback.answer("Ignorado")
+    if callback.message:
+        await callback.message.answer("🚫 Rascunho ignorado.")
