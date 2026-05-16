@@ -3,11 +3,12 @@ from aiogram.types import CallbackQuery
 
 from app.settings import get_settings
 from app.storage.events import log_event
+from app.ui import review_keyboard
 
 router = Router()
 
 
-async def _log_choice(callback: CallbackQuery, channel_slug: str, event_type: str) -> None:
+async def _log_choice(callback: CallbackQuery, channel_slug: str | None, event_type: str) -> None:
     settings = get_settings()
     await log_event(
         settings.database_path,
@@ -22,7 +23,10 @@ async def choose_c1(callback: CallbackQuery) -> None:
     await _log_choice(callback, "c1", "channel_selected")
     await callback.answer("Canal 1 selecionado")
     if callback.message:
-        await callback.message.answer("📘 Canal 1 selecionado. Próxima etapa: revisão editorial.")
+        await callback.message.answer(
+            "📘 Canal 1 selecionado. Revise o rascunho antes de publicar.",
+            reply_markup=review_keyboard(),
+        )
 
 
 @router.callback_query(F.data == "channel:c2")
@@ -30,7 +34,10 @@ async def choose_c2(callback: CallbackQuery) -> None:
     await _log_choice(callback, "c2", "channel_selected")
     await callback.answer("Canal 2 selecionado")
     if callback.message:
-        await callback.message.answer("📰 Canal 2 selecionado. Próxima etapa: revisão editorial.")
+        await callback.message.answer(
+            "📰 Canal 2 selecionado. Revise o rascunho antes de publicar.",
+            reply_markup=review_keyboard(),
+        )
 
 
 @router.callback_query(F.data == "channel:ignore")
