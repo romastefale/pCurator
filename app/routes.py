@@ -1,3 +1,4 @@
-from app.commands import router
+from app.commands import router as commands_router
+from app.link_flow import router as link_router
 
-ROUTERS = (router,)
+ROUTERS = (commands_router, link_router)
