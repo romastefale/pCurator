@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS articles (
     title TEXT,
     source_name TEXT,
     published_at TEXT,
+    image_url TEXT,
     text_hash TEXT,
     status TEXT NOT NULL DEFAULT 'new',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
