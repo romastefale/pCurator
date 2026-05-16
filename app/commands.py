@@ -4,6 +4,7 @@ from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
 from app.settings import get_settings
+from app.storage.posts import list_recent_posts
 
 router = Router()
 
@@ -56,3 +57,25 @@ async def status_command(message: Message) -> None:
         "Modo atual: manual assistido\n",
         parse_mode="HTML",
     )
+
+
+@router.message(Command("pq"))
+async def queue_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    settings = get_settings()
+    posts = await list_recent_posts(settings.database_path, limit=5)
+
+    if not posts:
+        await message.answer("Fila editorial vazia.")
+        return
+
+    lines = ["<b>Últimos rascunhos</b>", ""]
+    for post in posts:
+        image_status = "com imagem" if post.get("image_url") else "sem imagem"
+        lines.append(
+            f"#{post['id']} · {post['status']} · {post['channel_slug']} · {image_status}"
+        )
+
+    await message.answer("\n".join(lines), parse_mode="HTML")
