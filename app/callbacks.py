@@ -1,6 +1,7 @@
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
+from app.access import reject_callback_if_not_owner
 from app.services.publisher import publish_post
 from app.settings import get_settings
 from app.storage.events import log_event
@@ -44,6 +45,9 @@ def _resolve_channel_id(channel_slug: str | None) -> int | None:
 
 @router.callback_query(F.data == "channel:c1")
 async def choose_c1(callback: CallbackQuery) -> None:
+    if await reject_callback_if_not_owner(callback):
+        return
+
     settings = get_settings()
     post_id = await _active_post_id(callback)
     await set_active_post(
@@ -64,6 +68,9 @@ async def choose_c1(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "channel:c2")
 async def choose_c2(callback: CallbackQuery) -> None:
+    if await reject_callback_if_not_owner(callback):
+        return
+
     settings = get_settings()
     post_id = await _active_post_id(callback)
     await set_active_post(
@@ -84,6 +91,9 @@ async def choose_c2(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "channel:ignore")
 async def ignore_channel(callback: CallbackQuery) -> None:
+    if await reject_callback_if_not_owner(callback):
+        return
+
     await _log_choice(callback, None, "channel_ignored")
     settings = get_settings()
     await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
@@ -94,6 +104,9 @@ async def ignore_channel(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:publish")
 async def review_publish(callback: CallbackQuery) -> None:
+    if await reject_callback_if_not_owner(callback):
+        return
+
     settings = get_settings()
     post_id, channel_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
     await _log_choice(callback, channel_slug, "publish_requested")
@@ -125,6 +138,9 @@ async def review_publish(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:edit")
 async def review_edit(callback: CallbackQuery) -> None:
+    if await reject_callback_if_not_owner(callback):
+        return
+
     post_id = await _active_post_id(callback)
     await _log_choice(callback, None, "edit_requested")
     await callback.answer("Edição solicitada")
@@ -139,6 +155,9 @@ async def review_edit(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:image")
 async def review_image(callback: CallbackQuery) -> None:
+    if await reject_callback_if_not_owner(callback):
+        return
+
     post_id = await _active_post_id(callback)
     await _log_choice(callback, None, "image_requested")
     await callback.answer("Imagem solicitada")
@@ -153,6 +172,9 @@ async def review_image(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:ignore")
 async def review_ignore(callback: CallbackQuery) -> None:
+    if await reject_callback_if_not_owner(callback):
+        return
+
     await _log_choice(callback, None, "post_ignored")
     settings = get_settings()
     await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
