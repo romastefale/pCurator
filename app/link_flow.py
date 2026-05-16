@@ -3,6 +3,7 @@ import re
 from aiogram import Router
 from aiogram.types import Message
 
+from app.access import reject_message_if_not_owner
 from app.services.extractor import extract_item
 from app.services.fetcher import fetch_html
 from app.services.formatting import build_caption
@@ -31,6 +32,9 @@ async def handle_possible_link(message: Message) -> None:
 
     match = URL_RE.search(message.text)
     if not match:
+        return
+
+    if await reject_message_if_not_owner(message):
         return
 
     raw_url = match.group(0).strip()
