@@ -33,6 +33,15 @@ async def _active_post_id(callback: CallbackQuery) -> int | None:
 
 @router.callback_query(F.data == "channel:c1")
 async def choose_c1(callback: CallbackQuery) -> None:
+    settings = get_settings()
+    post_id = await _active_post_id(callback)
+    await set_active_post(
+        settings.database_path,
+        user_id=callback.from_user.id,
+        post_id=post_id,
+        mode="review",
+        channel_slug="c1",
+    )
     await _log_choice(callback, "c1", "channel_selected")
     await callback.answer("Canal 1 selecionado")
     if callback.message:
@@ -44,6 +53,15 @@ async def choose_c1(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "channel:c2")
 async def choose_c2(callback: CallbackQuery) -> None:
+    settings = get_settings()
+    post_id = await _active_post_id(callback)
+    await set_active_post(
+        settings.database_path,
+        user_id=callback.from_user.id,
+        post_id=post_id,
+        mode="review",
+        channel_slug="c2",
+    )
     await _log_choice(callback, "c2", "channel_selected")
     await callback.answer("Canal 2 selecionado")
     if callback.message:
