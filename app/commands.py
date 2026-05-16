@@ -5,6 +5,7 @@ from aiogram.types import Message
 from app.access import reject_message_if_not_owner
 from app.settings import get_settings
 from app.storage.posts import list_recent_posts
+from app.storage.sources import list_sources
 
 router = Router()
 
@@ -76,6 +77,28 @@ async def queue_command(message: Message) -> None:
         image_status = "com imagem" if post.get("image_url") else "sem imagem"
         lines.append(
             f"#{post['id']} · {post['status']} · {post['channel_slug']} · {image_status}"
+        )
+
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@router.message(Command("pf"))
+async def sources_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    settings = get_settings()
+    sources = await list_sources(settings.database_path, limit=10)
+
+    if not sources:
+        await message.answer("Nenhuma fonte cadastrada ainda.")
+        return
+
+    lines = ["<b>Fontes cadastradas</b>", ""]
+    for source in sources:
+        state = "bloqueada" if source["is_blocked"] else "ativa"
+        lines.append(
+            f"#{source['id']} · {source['name']} · {source['scope']} · {source['quality_score']} · {state}"
         )
 
     await message.answer("\n".join(lines), parse_mode="HTML")
