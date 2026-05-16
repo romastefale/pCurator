@@ -8,20 +8,34 @@ async def save_item(
     title: str | None,
     source_name: str | None,
     text_hash: str | None,
+    image_url: str | None = None,
 ) -> int:
     async with aiosqlite.connect(database_path) as db:
         cursor = await db.execute(
             """
             INSERT OR IGNORE INTO articles
-                (canonical_url, title, source_name, text_hash)
-            VALUES (?, ?, ?, ?)
+                (canonical_url, title, source_name, image_url, text_hash)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (canonical_url, title, source_name, text_hash),
+            (canonical_url, title, source_name, image_url, text_hash),
         )
         await db.commit()
 
         if cursor.lastrowid:
             return int(cursor.lastrowid)
+
+        await db.execute(
+            """
+            UPDATE articles
+            SET title = COALESCE(?, title),
+                source_name = COALESCE(?, source_name),
+                image_url = COALESCE(?, image_url),
+                text_hash = COALESCE(?, text_hash)
+            WHERE canonical_url = ?
+            """,
+            (title, source_name, image_url, text_hash, canonical_url),
+        )
+        await db.commit()
 
         existing = await db.execute(
             "SELECT id FROM articles WHERE canonical_url = ?",
