@@ -5,13 +5,21 @@ from aiogram.types import Message
 
 from app.services.extractor import extract_item
 from app.services.fetcher import fetch_html
+from app.services.formatting import build_caption
 from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
 from app.storage.items import save_item
+from app.storage.posts import save_post
 
 router = Router()
 
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+
+
+def _preview_body(text: str) -> str:
+    if not text:
+        return "Texto ainda pendente de revisão editorial."
+    return text[:360].strip()
 
 
 @router.message()
@@ -47,14 +55,31 @@ async def handle_possible_link(message: Message) -> None:
     )
 
     if item:
+        caption = build_caption(
+            hashtags=["Notícia", "Atualidade", "Curadoria"],
+            title=item.title,
+            subtitle="Prévia editorial gerada a partir da matéria original.",
+            body=_preview_body(item.text),
+            source_name=item.source,
+            url=canonical_url,
+        )
+        post_id = await save_post(
+            settings.database_path,
+            article_id=item_id,
+            channel_slug="manual",
+            caption_html=caption,
+            image_url=item.image_url,
+        )
+
         image_status = "imagem encontrada" if item.image_url else "sem imagem confiável ainda"
         await message.answer(
             "<b>Matéria extraída.</b>\n\n"
             f"Item #{item_id}\n"
+            f"Post #{post_id}\n"
             f"Fonte: {item.source}\n"
             f"Título: {item.title}\n"
             f"Status: {image_status}\n\n"
-            "Próxima etapa: escolha de canal e geração editorial.",
+            "Rascunho criado. Próxima etapa: escolha de canal e geração editorial.",
             parse_mode="HTML",
         )
         return
