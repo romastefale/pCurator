@@ -3,6 +3,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
+from app.settings import get_settings
 
 router = Router()
 
@@ -42,4 +43,16 @@ async def status_command(message: Message) -> None:
     if await reject_message_if_not_owner(message):
         return
 
-    await message.answer("pCurator em preparação. Fundação carregada.")
+    settings = get_settings()
+    c1 = "configurado" if settings.channel_1_id else "pendente"
+    c2 = "configurado" if settings.channel_2_id else "pendente"
+
+    await message.answer(
+        "<b>Status pCurator</b>\n\n"
+        "Base: carregada\n"
+        f"Banco: <code>{settings.database_path}</code>\n"
+        f"Canal 1: {c1}\n"
+        f"Canal 2: {c2}\n"
+        "Modo atual: manual assistido\n",
+        parse_mode="HTML",
+    )
