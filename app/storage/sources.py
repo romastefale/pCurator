@@ -35,3 +35,22 @@ async def upsert_source(
         )
         await db.commit()
         return int(cursor.lastrowid)
+
+
+async def update_source_score(database_path: str, source_id: int, quality_score: int) -> None:
+    quality_score = max(0, min(100, quality_score))
+    async with aiosqlite.connect(database_path) as db:
+        await db.execute(
+            "UPDATE sources SET quality_score = ? WHERE id = ?",
+            (quality_score, source_id),
+        )
+        await db.commit()
+
+
+async def set_source_blocked(database_path: str, source_id: int, is_blocked: bool) -> None:
+    async with aiosqlite.connect(database_path) as db:
+        await db.execute(
+            "UPDATE sources SET is_blocked = ? WHERE id = ?",
+            (1 if is_blocked else 0, source_id),
+        )
+        await db.commit()
