@@ -47,6 +47,13 @@ CREATE TABLE IF NOT EXISTS posts (
     FOREIGN KEY(article_id) REFERENCES articles(id)
 );
 
+CREATE TABLE IF NOT EXISTS editorial_sessions (
+    user_id INTEGER PRIMARY KEY,
+    active_post_id INTEGER,
+    mode TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS editorial_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     channel_slug TEXT,
