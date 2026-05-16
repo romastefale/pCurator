@@ -5,7 +5,12 @@ from aiogram.types import Message
 from app.access import reject_message_if_not_owner
 from app.settings import get_settings
 from app.storage.posts import list_recent_posts
-from app.storage.sources import list_sources, upsert_source
+from app.storage.sources import (
+    list_sources,
+    set_source_blocked,
+    update_source_score,
+    upsert_source,
+)
 
 router = Router()
 
@@ -36,6 +41,9 @@ async def help_command(message: Message) -> None:
         "/pq — fila editorial\n"
         "/pf — fontes\n"
         "/pfa Nome | url | escopo | nota — cadastrar fonte\n"
+        "/pfs ID nota — alterar nota da fonte\n"
+        "/pfb ID — bloquear fonte\n"
+        "/pfu ID — desbloquear fonte\n"
         "/pr — regras aprendidas\n",
         parse_mode="HTML",
     )
@@ -144,3 +152,67 @@ async def add_source_command(message: Message) -> None:
     await message.answer(
         f"Fonte cadastrada: #{source_id} · {name} · {scope} · {quality_score}"
     )
+
+
+@router.message(Command("pfs"))
+async def source_score_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    parts = (message.text or "").split()
+    if len(parts) < 3:
+        await message.answer("Formato: <code>/pfs ID nota</code>", parse_mode="HTML")
+        return
+
+    try:
+        source_id = int(parts[1])
+        quality_score = max(0, min(100, int(parts[2])))
+    except ValueError:
+        await message.answer("ID e nota precisam ser números.")
+        return
+
+    settings = get_settings()
+    await update_source_score(settings.database_path, source_id, quality_score)
+    await message.answer(f"Fonte #{source_id} atualizada para nota {quality_score}.")
+
+
+@router.message(Command("pfb"))
+async def source_block_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    parts = (message.text or "").split()
+    if len(parts) < 2:
+        await message.answer("Formato: <code>/pfb ID</code>", parse_mode="HTML")
+        return
+
+    try:
+        source_id = int(parts[1])
+    except ValueError:
+        await message.answer("ID precisa ser número.")
+        return
+
+    settings = get_settings()
+    await set_source_blocked(settings.database_path, source_id, True)
+    await message.answer(f"Fonte #{source_id} bloqueada.")
+
+
+@router.message(Command("pfu"))
+async def source_unblock_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    parts = (message.text or "").split()
+    if len(parts) < 2:
+        await message.answer("Formato: <code>/pfu ID</code>", parse_mode="HTML")
+        return
+
+    try:
+        source_id = int(parts[1])
+    except ValueError:
+        await message.answer("ID precisa ser número.")
+        return
+
+    settings = get_settings()
+    await set_source_blocked(settings.database_path, source_id, False)
+    await message.answer(f"Fonte #{source_id} desbloqueada.")
