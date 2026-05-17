@@ -4,6 +4,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
+from app.services.image_validation import is_probably_valid_image_url
 from app.types import ItemData
 
 
@@ -53,6 +54,8 @@ def _image_from_jsonld(value: Any) -> str | None:
 
 
 def _extract_image_url(soup: BeautifulSoup) -> str | None:
+    candidates: list[str] = []
+
     for property_name, name in (
         ("og:image", None),
         ("og:image:secure_url", None),
@@ -61,7 +64,7 @@ def _extract_image_url(soup: BeautifulSoup) -> str | None:
     ):
         found = _meta_content(soup, property_name=property_name, name=name)
         if found:
-            return found
+            candidates.append(found)
 
     for script in soup.find_all("script", type="application/ld+json"):
         try:
@@ -70,13 +73,17 @@ def _extract_image_url(soup: BeautifulSoup) -> str | None:
             continue
         found = _image_from_jsonld(payload)
         if found:
-            return found
+            candidates.append(found)
 
     article = soup.find("article")
     if article:
-        image = article.find("img")
-        if image and image.get("src"):
-            return image["src"].strip()
+        for image in article.find_all("img"):
+            if image.get("src"):
+                candidates.append(image["src"].strip())
+
+    for candidate in candidates:
+        if is_probably_valid_image_url(candidate):
+            return candidate
 
     return None
 
