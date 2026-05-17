@@ -7,10 +7,11 @@ from app.access import reject_message_if_not_owner
 from app.services.extractor import extract_item
 from app.services.fetcher import fetch_html
 from app.services.formatting import build_caption
+from app.services.preview import send_post_preview
 from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
 from app.storage.items import save_item
-from app.storage.posts import save_post
+from app.storage.posts import get_post, save_post
 from app.storage.session import set_active_post
 from app.ui import channel_keyboard
 
@@ -91,10 +92,15 @@ async def handle_possible_link(message: Message) -> None:
             f"Fonte: {item.source}\n"
             f"Título: {item.title}\n"
             f"Status: {image_status}\n\n"
-            "Escolha o canal para continuar.",
+            "Prévia abaixo. Depois escolha o canal para continuar.",
             parse_mode="HTML",
-            reply_markup=channel_keyboard(),
         )
+
+        post = await get_post(settings.database_path, post_id)
+        if post:
+            await send_post_preview(message.bot, message.chat.id, post)
+
+        await message.answer("Escolha o canal para continuar.", reply_markup=channel_keyboard())
         return
 
     await message.answer(
