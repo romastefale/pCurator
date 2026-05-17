@@ -17,7 +17,7 @@ async def regenerate_post_for_channel(
     item = ItemData(
         url=article.get("canonical_url") or "",
         title=article.get("title") or "Sem título",
-        text=article.get("text") or article.get("title") or "",
+        text=article.get("extracted_text") or article.get("title") or "",
         source=article.get("source_name") or "Web",
         image_url=article.get("image_url"),
     )
