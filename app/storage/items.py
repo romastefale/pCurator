@@ -9,15 +9,16 @@ async def save_item(
     source_name: str | None,
     text_hash: str | None,
     image_url: str | None = None,
+    extracted_text: str | None = None,
 ) -> int:
     async with aiosqlite.connect(database_path) as db:
         cursor = await db.execute(
             """
             INSERT OR IGNORE INTO articles
-                (canonical_url, title, source_name, image_url, text_hash)
-            VALUES (?, ?, ?, ?, ?)
+                (canonical_url, title, source_name, image_url, extracted_text, text_hash)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (canonical_url, title, source_name, image_url, text_hash),
+            (canonical_url, title, source_name, image_url, extracted_text, text_hash),
         )
         await db.commit()
 
@@ -30,10 +31,11 @@ async def save_item(
             SET title = COALESCE(?, title),
                 source_name = COALESCE(?, source_name),
                 image_url = COALESCE(?, image_url),
+                extracted_text = COALESCE(?, extracted_text),
                 text_hash = COALESCE(?, text_hash)
             WHERE canonical_url = ?
             """,
-            (title, source_name, image_url, text_hash, canonical_url),
+            (title, source_name, image_url, extracted_text, text_hash, canonical_url),
         )
         await db.commit()
 
