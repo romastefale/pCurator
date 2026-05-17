@@ -2,6 +2,7 @@ from pathlib import Path
 
 import aiosqlite
 
+from app.storage.migrations import apply_migrations
 from app.storage.schema import SCHEMA_SQL
 
 
@@ -12,3 +13,5 @@ async def init_db(database_path: str) -> None:
     async with aiosqlite.connect(path) as db:
         await db.executescript(SCHEMA_SQL)
         await db.commit()
+
+    await apply_migrations(str(path))
