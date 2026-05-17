@@ -55,6 +55,16 @@ CREATE TABLE IF NOT EXISTS editorial_sessions (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS learned_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_slug TEXT,
+    rule_type TEXT NOT NULL,
+    rule_text TEXT NOT NULL,
+    weight INTEGER NOT NULL DEFAULT 1,
+    is_enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS editorial_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     channel_slug TEXT,
