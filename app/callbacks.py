@@ -2,7 +2,9 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from app.access import reject_callback_if_not_owner
+from app.services.preview import send_post_preview
 from app.services.publisher import publish_post
+from app.services.regenerator import regenerate_post_for_channel
 from app.settings import get_settings
 from app.storage.events import log_event
 from app.storage.posts import get_post, update_post_status
@@ -43,11 +45,7 @@ def _resolve_channel_id(channel_slug: str | None) -> int | None:
     return None
 
 
-@router.callback_query(F.data == "channel:c1")
-async def choose_c1(callback: CallbackQuery) -> None:
-    if await reject_callback_if_not_owner(callback):
-        return
-
+async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, label: str) -> None:
     settings = get_settings()
     post_id = await _active_post_id(callback)
     await set_active_post(
@@ -55,38 +53,47 @@ async def choose_c1(callback: CallbackQuery) -> None:
         user_id=callback.from_user.id,
         post_id=post_id,
         mode="review",
-        channel_slug="c1",
+        channel_slug=channel_slug,
     )
-    await _log_choice(callback, "c1", "channel_selected")
-    await callback.answer("Canal 1 selecionado")
-    if callback.message:
-        await callback.message.answer(
-            "📘 Canal 1 selecionado. Revise o rascunho antes de publicar.",
-            reply_markup=review_keyboard(),
-        )
+    await _log_choice(callback, channel_slug, "channel_selected")
+    await callback.answer(f"{label} selecionado")
+
+    if not callback.message:
+        return
+
+    if post_id is None:
+        await callback.message.answer("Nenhum rascunho ativo encontrado.")
+        return
+
+    await callback.message.answer(f"{label} selecionado. Gerando prévia editorial...")
+    regenerated = await regenerate_post_for_channel(
+        settings.database_path,
+        post_id=post_id,
+        channel_slug=channel_slug,
+    )
+    post = await get_post(settings.database_path, post_id)
+
+    if regenerated and post:
+        await send_post_preview(callback.bot, callback.message.chat.id, post)
+
+    await callback.message.answer(
+        "Revise o rascunho antes de publicar.",
+        reply_markup=review_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "channel:c1")
+async def choose_c1(callback: CallbackQuery) -> None:
+    if await reject_callback_if_not_owner(callback):
+        return
+    await _prepare_channel_review(callback, "c1", "📘 Canal 1")
 
 
 @router.callback_query(F.data == "channel:c2")
 async def choose_c2(callback: CallbackQuery) -> None:
     if await reject_callback_if_not_owner(callback):
         return
-
-    settings = get_settings()
-    post_id = await _active_post_id(callback)
-    await set_active_post(
-        settings.database_path,
-        user_id=callback.from_user.id,
-        post_id=post_id,
-        mode="review",
-        channel_slug="c2",
-    )
-    await _log_choice(callback, "c2", "channel_selected")
-    await callback.answer("Canal 2 selecionado")
-    if callback.message:
-        await callback.message.answer(
-            "📰 Canal 2 selecionado. Revise o rascunho antes de publicar.",
-            reply_markup=review_keyboard(),
-        )
+    await _prepare_channel_review(callback, "c2", "📰 Canal 2")
 
 
 @router.callback_query(F.data == "channel:ignore")
