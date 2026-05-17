@@ -5,6 +5,7 @@ from aiogram.types import Message
 from app.access import reject_message_if_not_owner
 from app.settings import get_settings
 from app.storage.posts import list_recent_posts
+from app.storage.rules import add_rule, list_rules
 from app.storage.sources import (
     list_sources,
     set_source_blocked,
@@ -44,7 +45,8 @@ async def help_command(message: Message) -> None:
         "/pfs ID nota — alterar nota da fonte\n"
         "/pfb ID — bloquear fonte\n"
         "/pfu ID — desbloquear fonte\n"
-        "/pr — regras aprendidas\n",
+        "/pr — regras aprendidas\n"
+        "/pra canal | tipo | regra — cadastrar regra\n",
         parse_mode="HTML",
     )
 
@@ -216,3 +218,58 @@ async def source_unblock_command(message: Message) -> None:
     settings = get_settings()
     await set_source_blocked(settings.database_path, source_id, False)
     await message.answer(f"Fonte #{source_id} desbloqueada.")
+
+
+@router.message(Command("pr"))
+async def rules_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    settings = get_settings()
+    rules = await list_rules(settings.database_path, limit=10)
+
+    if not rules:
+        await message.answer("Nenhuma regra aprendida cadastrada ainda.")
+        return
+
+    lines = ["<b>Regras aprendidas</b>", ""]
+    for rule in rules:
+        state = "ativa" if rule["is_enabled"] else "inativa"
+        channel = rule["channel_slug"] or "global"
+        lines.append(
+            f"#{rule['id']} · {channel} · {rule['rule_type']} · peso {rule['weight']} · {state}\n{rule['rule_text']}"
+        )
+
+    await message.answer("\n\n".join(lines), parse_mode="HTML")
+
+
+@router.message(Command("pra"))
+async def add_rule_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    text = message.text or ""
+    raw = text.replace("/pra", "", 1).strip()
+    parts = [part.strip() for part in raw.split("|")]
+
+    if len(parts) < 3:
+        await message.answer(
+            "Formato: <code>/pra canal | tipo | regra</code>\n"
+            "Exemplo: <code>/pra c1 | tom | evitar assunto pesado no canal leve</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    channel_slug = parts[0] or None
+    rule_type = parts[1] or "general"
+    rule_text = parts[2]
+
+    settings = get_settings()
+    rule_id = await add_rule(
+        settings.database_path,
+        channel_slug=channel_slug,
+        rule_type=rule_type,
+        rule_text=rule_text,
+    )
+
+    await message.answer(f"Regra cadastrada: #{rule_id}")
