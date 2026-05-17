@@ -50,7 +50,8 @@ async def handle_possible_link(message: Message) -> None:
     title = item.title if item else None
     source_name = item.source if item else None
     image_url = item.image_url if item else None
-    text_hash = stable_hash(item.text if item and item.text else canonical_url)
+    extracted_text = item.text if item else None
+    text_hash = stable_hash(extracted_text if extracted_text else canonical_url)
 
     item_id = await save_item(
         settings.database_path,
@@ -58,6 +59,7 @@ async def handle_possible_link(message: Message) -> None:
         title=title,
         source_name=source_name,
         image_url=image_url,
+        extracted_text=extracted_text,
         text_hash=text_hash,
     )
 
