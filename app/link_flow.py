@@ -7,12 +7,14 @@ from app.access import reject_message_if_not_owner
 from app.services.extractor import extract_item
 from app.services.fetcher import fetch_html
 from app.services.formatting import build_caption
+from app.services.linkpreview import fetch_linkpreview
 from app.services.preview import send_post_preview
 from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
 from app.storage.items import save_item
 from app.storage.posts import get_post, save_post
 from app.storage.session import set_active_post
+from app.types import ItemData
 from app.ui import channel_keyboard
 
 router = Router()
@@ -46,6 +48,17 @@ async def handle_possible_link(message: Message) -> None:
 
     html = await fetch_html(canonical_url)
     item = extract_item(canonical_url, html)
+
+    if not item or not item.image_url:
+        preview_data = await fetch_linkpreview(canonical_url, settings.linkpreview_key)
+        if preview_data:
+            item = ItemData(
+                url=canonical_url,
+                title=(item.title if item else None) or preview_data.get("title") or "Sem título",
+                text=(item.text if item else "") or preview_data.get("description") or "",
+                source=(item.source if item else None) or preview_data.get("site_name") or "Web",
+                image_url=(item.image_url if item else None) or preview_data.get("image"),
+            )
 
     title = item.title if item else None
     source_name = item.source if item else None
