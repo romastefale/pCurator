@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
@@ -12,6 +14,7 @@ from app.storage.posts import get_post, save_post, update_post_status
 from app.storage.session import get_active_context, get_active_post, set_active_post
 from app.ui import channel_keyboard, review_keyboard
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 
@@ -83,53 +86,53 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
     )
 
 
-@router.callback_query(F.data.startswith("duplicate:regenerate:"))
+@router.callback_query(F.data.regexp(r"^duplicate:regenerate:\d+$"))
 async def duplicate_regenerate(callback: CallbackQuery) -> None:
     if await reject_callback_if_not_owner(callback):
         return
 
     settings = get_settings()
     parts = (callback.data or "").split(":")
-    if len(parts) < 3:
-        await callback.answer("Item inválido", show_alert=True)
-        return
 
     try:
         article_id = int(parts[2])
-    except ValueError:
-        await callback.answer("Item inválido", show_alert=True)
-        return
+        article = await get_article(article_id, settings.database_path)
+        if not article:
+            await callback.answer("Item não encontrado", show_alert=True)
+            return
 
-    article = await get_article(article_id, settings.database_path)
-    if not article:
-        await callback.answer("Item não encontrado", show_alert=True)
-        return
-
-    post_id = await save_post(
-        settings.database_path,
-        article_id=article_id,
-        channel_slug="manual",
-        caption_html="Novo rascunho interno criado a partir de item duplicado. Escolha C1 ou C2 para gerar o post editorial final.",
-        image_url=article.get("image_url"),
-    )
-    await set_active_post(
-        settings.database_path,
-        user_id=callback.from_user.id,
-        post_id=post_id,
-        mode="review",
-    )
-    await _log_choice(callback, None, "duplicate_regenerated")
-    await callback.answer("Novo rascunho criado")
-
-    if callback.message:
-        await callback.message.answer(
-            "🔁 Novo rascunho criado a partir da matéria duplicada.\n\n"
-            f"Item #{article_id}\n"
-            f"Post #{post_id}\n"
-            f"Título: {article.get('title') or 'Sem título'}\n\n"
-            "Escolha o canal para gerar a legenda editorial final.",
-            reply_markup=channel_keyboard(),
+        post_id = await save_post(
+            settings.database_path,
+            article_id=article_id,
+            channel_slug="manual",
+            caption_html="Novo rascunho interno criado a partir de item duplicado. Escolha C1 ou C2 para gerar o post editorial final.",
+            image_url=article.get("image_url"),
         )
+        await set_active_post(
+            settings.database_path,
+            user_id=callback.from_user.id,
+            post_id=post_id,
+            mode="review",
+        )
+        await _log_choice(callback, None, "duplicate_regenerated")
+        await callback.answer("Novo rascunho criado")
+
+        if callback.message:
+            await callback.message.answer(
+                "🔁 Novo rascunho criado a partir da matéria duplicada.\n\n"
+                f"Item #{article_id}\n"
+                f"Post #{post_id}\n"
+                f"Título: {article.get('title') or 'Sem título'}\n\n"
+                "Escolha o canal para gerar a legenda editorial final.",
+                reply_markup=channel_keyboard(),
+            )
+    except Exception as exc:
+        logger.exception("Duplicate regenerate callback failed: %s", type(exc).__name__)
+        await callback.answer("Erro ao gerar rascunho", show_alert=True)
+        if callback.message:
+            await callback.message.answer(
+                "⚠️ Erro ao gerar novo rascunho duplicado. Verifique os logs do Railway."
+            )
 
 
 @router.callback_query(F.data == "duplicate:ignore")
