@@ -1,4 +1,4 @@
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
@@ -11,11 +11,8 @@ from app.ui import review_keyboard
 router = Router()
 
 
-@router.message()
+@router.message(F.photo)
 async def handle_manual_image(message: Message) -> None:
-    if not message.photo:
-        return
-
     settings = get_settings()
     post_id, mode = await get_active_post(settings.database_path, message.from_user.id)
 
