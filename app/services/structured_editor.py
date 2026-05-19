@@ -1,4 +1,5 @@
 import json
+import re
 
 from openai import AsyncOpenAI
 
@@ -7,19 +8,54 @@ from app.settings import get_settings
 from app.types import ArticleIntake, PublicPost
 
 
+def _split_sentences(text: str) -> list[str]:
+    clean = re.sub(r"\s+", " ", text or "").strip()
+    if not clean:
+        return []
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", clean) if part.strip()]
+
+
+def _complete_summary(text: str, max_chars: int = 680) -> str:
+    sentences = _split_sentences(text)
+    if not sentences:
+        return "O conteúdo extraído precisa de revisão manual antes de publicação."
+
+    selected: list[str] = []
+    total = 0
+    for sentence in sentences:
+        next_total = total + len(sentence) + (1 if selected else 0)
+        if selected and next_total > max_chars:
+            break
+        selected.append(sentence)
+        total = next_total
+        if len(selected) >= 4:
+            break
+
+    summary = " ".join(selected).strip()
+    if not summary.endswith((".", "!", "?")):
+        summary += "."
+    return summary
+
+
+def _fallback_subtitle(article: ArticleIntake) -> str:
+    sentences = _split_sentences(article.clean_text)
+    for sentence in sentences:
+        if 40 <= len(sentence) <= 180:
+            return sentence
+    return "A informação principal foi extraída da matéria e deve ser revisada antes da publicação."
+
+
 def _fallback_public_post(article: ArticleIntake, channel_slug: str) -> PublicPost:
     base_hashtags = ["Notícia", "Atualidade", "Curadoria"]
     if "copa" in f"{article.clean_title} {article.clean_text}".lower():
         base_hashtags = ["Notícia", "Copa2026", "SeleçãoBrasileira"]
 
-    body = article.clean_text[:520].strip()
-    if not body:
-        body = "O conteúdo extraído precisa de revisão manual antes de publicação."
+    body = _complete_summary(article.clean_text)
 
     return PublicPost(
         hashtags=base_hashtags,
         title=article.clean_title[:110].strip() or "Notícia em revisão",
-        subtitle="Resumo editorial gerado a partir das informações principais da matéria.",
+        subtitle=_fallback_subtitle(article),
         body=body,
         source_url=article.url,
         publishable=bool(article.clean_text),
@@ -64,6 +100,7 @@ Regras obrigatórias:
 - Não inclua autoria, data de atualização ou 'Oferecido por'.
 - Gere título reescrito, subtítulo contextual e corpo resumido.
 - O corpo deve ser jornalístico, curto, claro e sem clickbait.
+- O resumo deve terminar em frase completa, sem corte seco no meio da ideia.
 - Se a confiança for baixa, use linguagem cautelosa.
 - Se o assunto não for adequado ao canal, marque publishable=false e needs_review=true.
 
