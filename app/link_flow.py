@@ -1,6 +1,6 @@
 import re
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
@@ -20,7 +20,8 @@ from app.ui import channel_keyboard
 
 router = Router()
 
-URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+URL_PATTERN = r"https?://\S+"
+URL_RE = re.compile(URL_PATTERN, re.IGNORECASE)
 
 
 def _preview_body(text: str) -> str:
@@ -29,12 +30,9 @@ def _preview_body(text: str) -> str:
     return text[:360].strip()
 
 
-@router.message()
+@router.message(F.text.regexp(URL_PATTERN))
 async def handle_possible_link(message: Message) -> None:
-    if not message.text:
-        return
-
-    match = URL_RE.search(message.text)
+    match = URL_RE.search(message.text or "")
     if not match:
         return
 
