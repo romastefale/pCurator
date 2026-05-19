@@ -28,14 +28,15 @@ async def generate_editorial_post(item: ItemData, channel_slug: str) -> Rendered
     if not settings.openai_key:
         return _fallback_post(item)
 
-    client = AsyncOpenAI(api_key=settings.openai_key)
-    channel_hint = (
-        "Canal 1: leve, pop, cultura digital, sem política/religião/temas pesados."
-        if channel_slug == "c1"
-        else "Canal 2: sério, jornalístico, maduro, imparcial, aceita política com cautela."
-    )
+    try:
+        client = AsyncOpenAI(api_key=settings.openai_key)
+        channel_hint = (
+            "Canal 1: leve, pop, cultura digital, sem política/religião/temas pesados."
+            if channel_slug == "c1"
+            else "Canal 2: sério, jornalístico, maduro, imparcial, aceita política com cautela."
+        )
 
-    user_prompt = f"""
+        user_prompt = f"""
 Canal: {channel_slug}
 Regra do canal: {channel_hint}
 Fonte: {item.source}
@@ -47,16 +48,19 @@ Texto extraído:
 Gere apenas o post final em HTML, sem explicações.
 """.strip()
 
-    response = await client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.4,
-    )
-    content = response.choices[0].message.content or ""
-    if not content.strip():
-        return _fallback_post(item)
+        response = await client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.4,
+        )
+        content = response.choices[0].message.content or ""
+        if not content.strip():
+            return _fallback_post(item)
 
-    return RenderedPost(text=content.strip(), image_url=item.image_url)
+        return RenderedPost(text=content.strip(), image_url=item.image_url)
+
+    except Exception:
+        return _fallback_post(item)
