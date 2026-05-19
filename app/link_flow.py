@@ -78,7 +78,7 @@ async def handle_possible_link(message: Message) -> None:
             f"Título: {duplicate.get('title') or 'Sem título'}\n"
             f"Fonte: {duplicate.get('source_name') or 'Web'}\n\n"
             "Quer gerar um novo rascunho mesmo assim?",
-            reply_markup=duplicate_keyboard(),
+            reply_markup=duplicate_keyboard(int(duplicate["id"])),
         )
         return
 
