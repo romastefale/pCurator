@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     owner_id: int
     channel_1_id: int | None = None
     channel_2_id: int | None = None
+    mira_group_id: int = -5027293000
+    mira_timeout_seconds: int = 90
     database_path: str = "./data/pcurator.db"
     timezone: str = "America/Sao_Paulo"
 
