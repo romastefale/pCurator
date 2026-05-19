@@ -1,4 +1,4 @@
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
@@ -11,11 +11,8 @@ from app.ui import review_keyboard
 router = Router()
 
 
-@router.message()
+@router.message(F.text)
 async def handle_edit_text(message: Message) -> None:
-    if not message.text:
-        return
-
     settings = get_settings()
     post_id, mode = await get_active_post(settings.database_path, message.from_user.id)
 
