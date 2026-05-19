@@ -4,4 +4,4 @@ from app.edit_flow import router as edit_router
 from app.image_flow import router as image_router
 from app.link_flow import router as link_router
 
-ROUTERS = (commands_router, image_router, edit_router, link_router, callback_router)
+ROUTERS = (commands_router, link_router, image_router, edit_router, callback_router)
