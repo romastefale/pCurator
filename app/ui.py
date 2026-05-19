@@ -33,3 +33,14 @@ def channel_keyboard() -> InlineKeyboardMarkup:
             [_button(text="🚫 IGN", callback_data="channel:ignore", style="danger")],
         ]
     )
+
+
+def duplicate_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                _button(text="🔁 GERAR", callback_data="duplicate:regenerate", style="primary"),
+                _button(text="🚫 IGN", callback_data="duplicate:ignore", style="danger"),
+            ]
+        ]
+    )
