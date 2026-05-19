@@ -11,7 +11,7 @@ from app.services.linkpreview import fetch_linkpreview
 from app.services.preview import send_post_preview
 from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
-from app.storage.items import save_item
+from app.storage.items import find_duplicate_item, save_item
 from app.storage.posts import get_post, save_post
 from app.storage.session import set_active_post
 from app.types import ItemData
@@ -65,6 +65,20 @@ async def handle_possible_link(message: Message) -> None:
     image_url = item.image_url if item else None
     extracted_text = item.text if item else None
     text_hash = stable_hash(extracted_text if extracted_text else canonical_url)
+
+    duplicate = await find_duplicate_item(
+        settings.database_path,
+        canonical_url=canonical_url,
+        text_hash=text_hash,
+    )
+    if duplicate:
+        await message.answer(
+            "⚠️ Matéria potencialmente duplicada detectada.\n\n"
+            f"Item existente: #{duplicate['id']}\n"
+            f"Título: {duplicate.get('title') or 'Sem título'}\n"
+            f"Fonte: {duplicate.get('source_name') or 'Web'}"
+        )
+        return
 
     item_id = await save_item(
         settings.database_path,
