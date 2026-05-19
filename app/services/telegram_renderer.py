@@ -1,4 +1,5 @@
 import html
+import re
 
 from app.types import PublicPost
 
@@ -8,15 +9,25 @@ def _clean_hashtag(value: str) -> str:
     return cleaned.strip("#")
 
 
+def _compact_inline(value: str) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()
+
+
+def _normalize_post_spacing(value: str) -> str:
+    value = re.sub(r"[ \t]+", " ", value)
+    value = re.sub(r"\n{3,}", "\n\n", value)
+    return value.strip()
+
+
 def render_public_post_html(post: PublicPost) -> str:
     hashtags = [_clean_hashtag(tag) for tag in post.hashtags]
     hashtags = [tag for tag in hashtags if tag]
     hashtags_line = " ".join(f"#{tag}" for tag in hashtags[:4])
 
-    title = html.escape(post.title.strip())
-    subtitle = html.escape(post.subtitle.strip())
-    body = html.escape(post.body.strip())
-    source_url = html.escape(post.source_url.strip(), quote=True)
+    title = html.escape(_compact_inline(post.title))
+    subtitle = html.escape(_compact_inline(post.subtitle))
+    body = html.escape(_compact_inline(post.body))
+    source_url = html.escape(_compact_inline(post.source_url), quote=True)
 
     parts = [
         hashtags_line,
@@ -31,4 +42,4 @@ def render_public_post_html(post: PublicPost) -> str:
     if source_url:
         parts.extend(["", f"<a href=\"{source_url}\">&#8203;</a>"])
 
-    return "\n".join(parts).strip()
+    return _normalize_post_spacing("\n".join(parts))
