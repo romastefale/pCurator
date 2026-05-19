@@ -54,3 +54,36 @@ async def item_exists(database_path: str, canonical_url: str) -> bool:
             (canonical_url,),
         )
         return await cursor.fetchone() is not None
+
+
+async def find_duplicate_item(
+    database_path: str,
+    *,
+    canonical_url: str,
+    text_hash: str | None,
+) -> dict | None:
+    async with aiosqlite.connect(database_path) as db:
+        db.row_factory = aiosqlite.Row
+        if text_hash:
+            cursor = await db.execute(
+                """
+                SELECT id, canonical_url, title, source_name
+                FROM articles
+                WHERE canonical_url = ? OR text_hash = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (canonical_url, text_hash),
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT id, canonical_url, title, source_name
+                FROM articles
+                WHERE canonical_url = ?
+                LIMIT 1
+                """,
+                (canonical_url,),
+            )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
