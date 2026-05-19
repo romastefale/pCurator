@@ -18,6 +18,29 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
+def _log_callback_received(callback: CallbackQuery) -> None:
+    logger.info(
+        "callback_received data=%s user=%s",
+        callback.data,
+        callback.from_user.id if callback.from_user else None,
+    )
+
+
+def _generation_warning(metadata: dict) -> str | None:
+    if not metadata.get("ok"):
+        return "⚠️ Não consegui gerar a prévia editorial. Verifique os logs do Railway."
+
+    if not metadata.get("used_openai"):
+        notes = ", ".join(metadata.get("quality_notes") or []) or "fallback_local"
+        return f"⚠️ IA não utilizada. Foi usado fallback local.\nMotivo: {notes}"
+
+    if metadata.get("needs_review") or not metadata.get("publishable", True):
+        notes = ", ".join(metadata.get("quality_notes") or []) or "revisão necessária"
+        return f"⚠️ Revisão reforçada recomendada.\nMotivo: {notes}"
+
+    return None
+
+
 async def _log_choice(callback: CallbackQuery, channel_slug: str | None, event_type: str) -> None:
     settings = get_settings()
     post_id, active_channel, mode = await get_active_context(settings.database_path, callback.from_user.id)
@@ -50,6 +73,7 @@ def _resolve_channel_id(channel_slug: str | None) -> int | None:
 
 
 async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, label: str) -> None:
+    _log_callback_received(callback)
     settings = get_settings()
     post_id = await _active_post_id(callback)
     await set_active_post(
@@ -70,15 +94,19 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
         return
 
     await callback.message.answer(f"{label} selecionado. Gerando prévia editorial...")
-    regenerated = await regenerate_post_for_channel(
+    metadata = await regenerate_post_for_channel(
         settings.database_path,
         post_id=post_id,
         channel_slug=channel_slug,
     )
     post = await get_post(settings.database_path, post_id)
 
-    if regenerated and post:
+    if metadata.get("ok") and post:
         await send_post_preview(callback.bot, callback.message.chat.id, post)
+
+    warning = _generation_warning(metadata)
+    if warning:
+        await callback.message.answer(warning)
 
     await callback.message.answer(
         "Revise o rascunho antes de publicar.",
@@ -88,6 +116,7 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
 
 @router.callback_query(F.data.regexp(r"^duplicate:regenerate:\d+$"))
 async def duplicate_regenerate(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
@@ -137,6 +166,7 @@ async def duplicate_regenerate(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "duplicate:ignore")
 async def duplicate_ignore(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
@@ -162,6 +192,7 @@ async def choose_c2(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "channel:ignore")
 async def ignore_channel(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
@@ -175,6 +206,7 @@ async def ignore_channel(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:publish")
 async def review_publish(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
@@ -209,6 +241,7 @@ async def review_publish(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:edit")
 async def review_edit(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
@@ -226,6 +259,7 @@ async def review_edit(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:image")
 async def review_image(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
@@ -243,6 +277,7 @@ async def review_image(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:ignore")
 async def review_ignore(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
