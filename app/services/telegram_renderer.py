@@ -15,7 +15,7 @@ def _compact_inline(value: str) -> str:
 
 def _normalize_post_spacing(value: str) -> str:
     value = re.sub(r"[ \t]+", " ", value)
-    value = re.sub(r"\n{3,}", "\n\n", value)
+    value = re.sub(r"\n{2,}", "\n", value)
     return value.strip()
 
 
@@ -31,15 +31,13 @@ def render_public_post_html(post: PublicPost) -> str:
 
     parts = [
         hashtags_line,
-        "",
         f"<b>{title}</b>",
-        "",
         f"<i>{subtitle}</i>",
-        "",
         f"<blockquote><i>{body}</i></blockquote>",
     ]
 
+    text = "\n".join(part for part in parts if part.strip())
     if source_url:
-        parts.extend(["", f"<a href=\"{source_url}\">&#8203;</a>"])
+        text += f"<a href=\"{source_url}\">&#8203;</a>"
 
-    return _normalize_post_spacing("\n".join(parts))
+    return _normalize_post_spacing(text)
