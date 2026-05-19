@@ -5,4 +5,4 @@ from app.image_flow import router as image_router
 from app.link_flow import router as link_router
 from app.mira_flow import router as mira_router
 
-ROUTERS = (commands_router, mira_router, link_router, image_router, edit_router, callback_router)
+ROUTERS = (commands_router, link_router, mira_router, image_router, edit_router, callback_router)
