@@ -7,16 +7,20 @@ from app.storage.posts import update_post_caption, update_post_image
 from app.types import ArticleIntake
 
 
+def _used_openai(quality_notes: list[str]) -> bool:
+    return not any(note.startswith("openai_") or note.startswith("fallback_") for note in quality_notes)
+
+
 async def regenerate_post_for_channel(
     database_path: str,
     *,
     post_id: int,
     channel_slug: str,
     risk_score: int = 100,
-) -> bool:
+) -> dict:
     article = await get_article_for_post(database_path, post_id)
     if not article:
-        return False
+        return {"ok": False, "used_openai": False, "quality_notes": ["article_not_found"]}
 
     raw_title = article.get("title") or "Sem título"
     extracted_text = article.get("extracted_text") or ""
@@ -41,4 +45,11 @@ async def regenerate_post_for_channel(
     if intake.image_url:
         await update_post_image(database_path, post_id, intake.image_url)
 
-    return True
+    quality_notes = list(public_post.quality_notes)
+    return {
+        "ok": True,
+        "used_openai": _used_openai(quality_notes),
+        "needs_review": public_post.needs_review,
+        "publishable": public_post.publishable,
+        "quality_notes": quality_notes,
+    }
