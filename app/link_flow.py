@@ -4,30 +4,22 @@ from aiogram import F, Router
 from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
-from app.services.extractor import extract_item
+from app.services.article_extractor_v2 import extract_article_intake
 from app.services.fetcher import fetch_html
-from app.services.formatting import build_caption
 from app.services.linkpreview import fetch_linkpreview
-from app.services.preview import send_post_preview
 from app.services.risk import assess_link_risk
 from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
 from app.storage.items import find_duplicate_item, save_item
-from app.storage.posts import get_post, save_post
+from app.storage.posts import save_post
 from app.storage.session import set_active_post
-from app.types import ItemData
+from app.types import ArticleIntake
 from app.ui import channel_keyboard
 
 router = Router()
 
 URL_PATTERN = r"https?://\S+"
 URL_RE = re.compile(URL_PATTERN, re.IGNORECASE)
-
-
-def _preview_body(text: str) -> str:
-    if not text:
-        return "Texto ainda pendente de revisão editorial."
-    return text[:360].strip()
 
 
 @router.message(F.text.regexp(URL_PATTERN))
@@ -46,24 +38,33 @@ async def handle_possible_link(message: Message) -> None:
     await message.answer("🔎 Link recebido. Extraindo matéria...")
 
     html = await fetch_html(canonical_url)
-    item = extract_item(canonical_url, html)
+    intake = extract_article_intake(canonical_url, html)
 
-    if not item or not item.image_url:
+    if not intake or not intake.image_url:
         preview_data = await fetch_linkpreview(canonical_url, settings.linkpreview_key)
         if preview_data:
-            item = ItemData(
-                url=canonical_url,
-                title=(item.title if item else None) or preview_data.get("title") or "Sem título",
-                text=(item.text if item else "") or preview_data.get("description") or "",
-                source=(item.source if item else None) or preview_data.get("site_name") or "Web",
-                image_url=(item.image_url if item else None) or preview_data.get("image"),
-            )
+            if intake:
+                if not intake.image_url:
+                    intake.image_url = preview_data.get("image")
+            else:
+                intake = ArticleIntake(
+                    url=canonical_url,
+                    raw_title=preview_data.get("title") or "Sem título",
+                    clean_title=preview_data.get("title") or "Sem título",
+                    clean_text=preview_data.get("description") or "",
+                    source=preview_data.get("site_name") or "Web",
+                    image_url=preview_data.get("image"),
+                )
 
-    title = item.title if item else None
-    source_name = item.source if item else None
-    image_url = item.image_url if item else None
-    extracted_text = item.text if item else None
-    text_hash = stable_hash(extracted_text if extracted_text else canonical_url)
+    if not intake:
+        await message.answer(
+            "<b>Extração falhou.</b>\n\n"
+            "Não consegui obter título ou texto suficiente para criar rascunho.",
+            parse_mode="HTML",
+        )
+        return
+
+    text_hash = stable_hash(intake.clean_text if intake.clean_text else canonical_url)
 
     duplicate = await find_duplicate_item(
         settings.database_path,
@@ -79,7 +80,7 @@ async def handle_possible_link(message: Message) -> None:
         )
         return
 
-    risk = assess_link_risk(title, extracted_text)
+    risk = assess_link_risk(intake.clean_title, intake.clean_text)
     if risk["should_hold"]:
         flags = ", ".join(risk["flags"]) or "sem detalhes"
         await message.answer(
@@ -91,59 +92,38 @@ async def handle_possible_link(message: Message) -> None:
     item_id = await save_item(
         settings.database_path,
         canonical_url=canonical_url,
-        title=title,
-        source_name=source_name,
-        image_url=image_url,
-        extracted_text=extracted_text,
+        title=intake.clean_title,
+        source_name=intake.source,
+        image_url=intake.image_url,
+        extracted_text=intake.clean_text,
         text_hash=text_hash,
     )
 
-    if item:
-        caption = build_caption(
-            hashtags=["Notícia", "Atualidade", "Curadoria"],
-            title=item.title,
-            subtitle="Prévia editorial gerada a partir da matéria original.",
-            body=_preview_body(item.text),
-            source_name=item.source,
-            url=canonical_url,
-        )
-        post_id = await save_post(
-            settings.database_path,
-            article_id=item_id,
-            channel_slug="manual",
-            caption_html=caption,
-            image_url=item.image_url,
-        )
-        await set_active_post(
-            settings.database_path,
-            user_id=message.from_user.id,
-            post_id=post_id,
-            mode="review",
-        )
+    post_id = await save_post(
+        settings.database_path,
+        article_id=item_id,
+        channel_slug="manual",
+        caption_html="Rascunho interno criado. Escolha C1 ou C2 para gerar o post editorial final.",
+        image_url=intake.image_url,
+    )
+    await set_active_post(
+        settings.database_path,
+        user_id=message.from_user.id,
+        post_id=post_id,
+        mode="review",
+    )
 
-        image_status = "imagem encontrada" if item.image_url else "sem imagem confiável ainda"
-        await message.answer(
-            "<b>Matéria extraída.</b>\n\n"
-            f"Item #{item_id}\n"
-            f"Post #{post_id}\n"
-            f"Fonte: {item.source}\n"
-            f"Título: {item.title}\n"
-            f"Status: {image_status}\n"
-            f"Risco editorial: {risk['score']}\n\n"
-            "Prévia abaixo. Depois escolha o canal para continuar.",
-            parse_mode="HTML",
-        )
-
-        post = await get_post(settings.database_path, post_id)
-        if post:
-            await send_post_preview(message.bot, message.chat.id, post)
-
-        await message.answer("Escolha o canal para continuar.", reply_markup=channel_keyboard())
-        return
-
+    image_status = "imagem encontrada" if intake.image_url else "sem imagem confiável ainda"
     await message.answer(
-        "<b>Link salvo, mas a extração falhou.</b>\n\n"
+        "<b>Matéria recebida para curadoria.</b>\n\n"
         f"Item #{item_id}\n"
-        "Será necessário revisar manualmente ou tentar outro link.",
+        f"Post #{post_id}\n"
+        f"Fonte: {intake.source}\n"
+        f"Título limpo: {intake.clean_title}\n"
+        f"Texto extraído: {len(intake.clean_text)} caracteres\n"
+        f"Imagem: {image_status}\n"
+        f"Risco editorial: {risk['score']}\n\n"
+        "Escolha o canal para gerar a legenda editorial final.",
         parse_mode="HTML",
+        reply_markup=channel_keyboard(),
     )
