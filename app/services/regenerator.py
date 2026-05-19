@@ -1,4 +1,9 @@
+import logging
+
+from aiogram import Bot
+
 from app.services.article_cleaner import clean_extracted_text, compact_source_name, normalize_title
+from app.services.mira_bridge import request_mira_public_post
 from app.services.post_validator import force_review, validate_public_post
 from app.services.structured_editor import generate_structured_public_post
 from app.services.telegram_renderer import render_public_post_html
@@ -6,9 +11,15 @@ from app.storage.articles import get_article_for_post
 from app.storage.posts import update_post_caption, update_post_image
 from app.types import ArticleIntake
 
+logger = logging.getLogger(__name__)
 
-def _used_openai(quality_notes: list[str]) -> bool:
-    return not any(note.startswith("openai_") or note.startswith("fallback_") for note in quality_notes)
+
+def _engine_from_notes(quality_notes: list[str]) -> str:
+    if "mira_used" in quality_notes:
+        return "mira"
+    if any(note.startswith("openai_") or note.startswith("fallback_") for note in quality_notes):
+        return "fallback"
+    return "openai"
 
 
 async def regenerate_post_for_channel(
@@ -17,10 +28,11 @@ async def regenerate_post_for_channel(
     post_id: int,
     channel_slug: str,
     risk_score: int = 100,
+    bot: Bot | None = None,
 ) -> dict:
     article = await get_article_for_post(database_path, post_id)
     if not article:
-        return {"ok": False, "used_openai": False, "quality_notes": ["article_not_found"]}
+        return {"ok": False, "engine": "none", "quality_notes": ["article_not_found"]}
 
     raw_title = article.get("title") or "Sem título"
     extracted_text = article.get("extracted_text") or ""
@@ -34,7 +46,17 @@ async def regenerate_post_for_channel(
         image_url=article.get("image_url"),
     )
 
-    public_post = await generate_structured_public_post(intake, channel_slug, risk_score=risk_score)
+    if bot is not None:
+        try:
+            public_post = await request_mira_public_post(bot, intake, channel_slug, risk_score=risk_score)
+        except Exception as exc:
+            logger.exception("Mira editorial generation failed: %s", type(exc).__name__)
+            public_post = await generate_structured_public_post(intake, channel_slug, risk_score=risk_score)
+            public_post.quality_notes.append(f"mira_error:{type(exc).__name__}")
+    else:
+        public_post = await generate_structured_public_post(intake, channel_slug, risk_score=risk_score)
+        public_post.quality_notes.append("mira_unavailable:no_bot")
+
     is_valid, issues = validate_public_post(public_post, intake)
     if not is_valid:
         public_post = force_review(public_post, issues)
@@ -46,9 +68,12 @@ async def regenerate_post_for_channel(
         await update_post_image(database_path, post_id, intake.image_url)
 
     quality_notes = list(public_post.quality_notes)
+    engine = _engine_from_notes(quality_notes)
     return {
         "ok": True,
-        "used_openai": _used_openai(quality_notes),
+        "engine": engine,
+        "used_mira": engine == "mira",
+        "used_openai": engine == "openai",
         "needs_review": public_post.needs_review,
         "publishable": public_post.publishable,
         "quality_notes": quality_notes,
