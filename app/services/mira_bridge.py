@@ -5,7 +5,6 @@ import re
 import uuid
 
 from aiogram import Bot
-from aiogram.enums import ParseMode
 
 from app.services.editorial_schema import PUBLIC_POST_JSON_SCHEMA
 from app.settings import get_settings
@@ -20,7 +19,7 @@ def _schema_instruction() -> str:
     return json.dumps(PUBLIC_POST_JSON_SCHEMA["schema"], ensure_ascii=False)
 
 
-def build_mira_prompt(article: ArticleIntake, channel_slug: str, risk_score: int) -> str:
+def build_mira_prompt(article: ArticleIntake, channel_slug: str, risk_score: int) -> tuple[str, str]:
     channel_hint = (
         "Canal 1: leve, pop, cultura digital, celebridades, comportamento e entretenimento. Evite política, religião, crime pesado, tragédia e tema excessivamente sensível."
         if channel_slug == "c1"
@@ -103,7 +102,6 @@ async def request_mira_public_post(bot: Bot, article: ArticleIntake, channel_slu
         sent = await bot.send_message(
             chat_id=settings.mira_group_id,
             text=prompt,
-            parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
         )
         logger.info("mira_request_sent request_id=%s message_id=%s", request_id, sent.message_id)
