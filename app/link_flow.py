@@ -9,6 +9,7 @@ from app.services.fetcher import fetch_html
 from app.services.formatting import build_caption
 from app.services.linkpreview import fetch_linkpreview
 from app.services.preview import send_post_preview
+from app.services.risk import assess_link_risk
 from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
 from app.storage.items import find_duplicate_item, save_item
@@ -80,6 +81,15 @@ async def handle_possible_link(message: Message) -> None:
         )
         return
 
+    risk = assess_link_risk(title, extracted_text)
+    if risk["should_hold"]:
+        flags = ", ".join(risk["flags"]) or "sem detalhes"
+        await message.answer(
+            "⚠️ Conteúdo marcado para revisão manual forte.\n\n"
+            f"Risco: {risk['score']}\n"
+            f"Sinais: {flags}"
+        )
+
     item_id = await save_item(
         settings.database_path,
         canonical_url=canonical_url,
@@ -120,7 +130,8 @@ async def handle_possible_link(message: Message) -> None:
             f"Post #{post_id}\n"
             f"Fonte: {item.source}\n"
             f"Título: {item.title}\n"
-            f"Status: {image_status}\n\n"
+            f"Status: {image_status}\n"
+            f"Risco editorial: {risk['score']}\n\n"
             "Prévia abaixo. Depois escolha o canal para continuar.",
             parse_mode="HTML",
         )
