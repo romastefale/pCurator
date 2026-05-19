@@ -43,16 +43,27 @@ def _extract_json(text: str) -> dict | None:
             return None
 
 
+def _as_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        parts = re.split(r"[,#;\n]+", value)
+        return [part.strip().lstrip("#") for part in parts if part.strip()]
+    return [str(value).strip()] if str(value).strip() else []
+
+
 def _post_from_dict(data: dict, article: ArticleIntake) -> PublicPost:
     return PublicPost(
-        hashtags=list(data.get("hashtags") or []),
+        hashtags=_as_list(data.get("hashtags")),
         title=str(data.get("title") or article.clean_title),
         subtitle=str(data.get("subtitle") or ""),
         body=str(data.get("body") or ""),
         source_url=str(data.get("source_url") or article.url),
         publishable=bool(data.get("publishable", True)),
         needs_review=bool(data.get("needs_review", False)),
-        quality_notes=list(data.get("quality_notes") or []),
+        quality_notes=_as_list(data.get("quality_notes")),
     )
 
 
@@ -80,9 +91,13 @@ async def resolve_mira_response(reply_to_text: str | None, response_text: str | 
         return False
     match = re.search(r"ID do pedido:\s*([a-f0-9]{12})", reply_to_text, flags=re.IGNORECASE)
     if not match:
+        logger.info("mira_response_ignored reason=request_id_not_found")
         return False
-    future = _PENDING.get(match.group(1))
+    request_id = match.group(1)
+    future = _PENDING.get(request_id)
     if not future or future.done():
+        logger.info("mira_response_ignored reason=no_pending_request request_id=%s", request_id)
         return False
     future.set_result(response_text)
+    logger.info("mira_response_resolved request_id=%s", request_id)
     return True
