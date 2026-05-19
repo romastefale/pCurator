@@ -11,11 +11,14 @@ async def fetch_linkpreview(url: str, api_key: str | None) -> dict | None:
     params = {"key": api_key, "q": url}
     timeout = aiohttp.ClientTimeout(total=15)
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(LINKPREVIEW_ENDPOINT, params=params) as response:
-            if response.status >= 400:
-                return None
-            data = await response.json(content_type=None)
-            if not isinstance(data, dict):
-                return None
-            return data
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(LINKPREVIEW_ENDPOINT, params=params) as response:
+                if response.status >= 400:
+                    return None
+                data = await response.json(content_type=None)
+                if not isinstance(data, dict):
+                    return None
+                return data
+    except Exception:
+        return None
