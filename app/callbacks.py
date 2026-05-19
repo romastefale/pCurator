@@ -30,15 +30,15 @@ def _generation_warning(metadata: dict) -> str | None:
     if not metadata.get("ok"):
         return "⚠️ Não consegui gerar a prévia editorial. Verifique os logs do Railway."
 
-    if not metadata.get("used_openai"):
-        notes = ", ".join(metadata.get("quality_notes") or []) or "fallback_local"
-        return f"⚠️ IA não utilizada. Foi usado fallback local.\nMotivo: {notes}"
+    engine = metadata.get("engine")
+    if engine == "mira":
+        return None
 
-    if metadata.get("needs_review") or not metadata.get("publishable", True):
-        notes = ", ".join(metadata.get("quality_notes") or []) or "revisão necessária"
-        return f"⚠️ Revisão reforçada recomendada.\nMotivo: {notes}"
+    notes = ", ".join(metadata.get("quality_notes") or []) or "sem detalhes"
+    if engine == "openai":
+        return f"⚠️ Mira não respondeu. Foi usado fallback OpenAI.\nMotivo: {notes}"
 
-    return None
+    return f"⚠️ Mira e OpenAI não foram usadas com sucesso. Foi usado fallback local.\nMotivo: {notes}"
 
 
 async def _log_choice(callback: CallbackQuery, channel_slug: str | None, event_type: str) -> None:
@@ -98,6 +98,7 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
         settings.database_path,
         post_id=post_id,
         channel_slug=channel_slug,
+        bot=callback.bot,
     )
     post = await get_post(settings.database_path, post_id)
 
