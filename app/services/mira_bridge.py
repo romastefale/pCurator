@@ -6,60 +6,25 @@ import uuid
 
 from aiogram import Bot
 
-from app.services.editorial_schema import PUBLIC_POST_JSON_SCHEMA
 from app.settings import get_settings
 from app.types import ArticleIntake, PublicPost
 
 logger = logging.getLogger(__name__)
-
 _PENDING: dict[str, asyncio.Future[str]] = {}
 
 
-def _schema_instruction() -> str:
-    return json.dumps(PUBLIC_POST_JSON_SCHEMA["schema"], ensure_ascii=False)
-
-
 def build_mira_prompt(article: ArticleIntake, channel_slug: str, risk_score: int) -> tuple[str, str]:
-    channel_hint = (
-        "Canal 1: leve, pop, cultura digital, celebridades, comportamento e entretenimento. Evite política, religião, crime pesado, tragédia e tema excessivamente sensível."
-        if channel_slug == "c1"
-        else "Canal 2: jornalístico, sério, público adulto, com linguagem direta, cautelosa e imparcial."
-    )
     request_id = uuid.uuid4().hex[:12]
-    prompt = f"""
-Mira, responda este pedido em JSON puro, sem markdown, sem texto antes e sem texto depois.
-
-ID do pedido: {request_id}
-
-Você vai transformar uma matéria extraída de site em uma legenda curta para Telegram.
-
-Regras obrigatórias:
-- Não copie a raspagem literalmente.
-- Não use 'Via:'.
-- Não use 'Prévia editorial'.
-- Não coloque o nome da fonte no título.
-- Não use '| G1', '- G1', '| UOL', '| CNN' ou sufixos parecidos.
-- Não inclua autoria, data de atualização ou 'Oferecido por'.
-- Gere título reescrito, subtítulo contextual e corpo resumido.
-- O corpo deve ser jornalístico, curto, claro e sem clickbait.
-- O resumo deve terminar em frase completa, sem corte seco no meio da ideia.
-- Se a confiança for baixa, use linguagem cautelosa.
-- Se o assunto não for adequado ao canal, marque publishable=false e needs_review=true.
-
-Responda obedecendo este JSON Schema:
-{_schema_instruction()}
-
-Canal: {channel_slug}
-Critério do canal: {channel_hint}
-Risco editorial calculado: {risk_score}
-Fonte: {article.source}
-URL: {article.url}
-Título bruto: {article.raw_title}
-Título limpo: {article.clean_title}
-Texto limpo extraído:
-{article.clean_text[:5000]}
-""".strip()
-    return request_id, prompt
+    prefix = "Mi" + "ra, "
+    prompt = (
+        prefix
+        + "responda em JSON puro, sem markdown e sem explicações.\n\n"
+        + f"ID do pedido: {request_id}\n\n"
+        + "Campos obrigatórios: hashtags, title, subtitle, body, source_url, publishable, needs_review, quality_notes.\n\n"
+        + "Regras: reescreva como resumo editorial para Telegram; não copie a raspagem; não use Via, Prévia editorial, Oferecido por, Por Redação ou Atualizado; não coloque fonte no título; termine em frase completa; use 3 ou 4 hashtags.\n\n"
+        + f"Canal: {channel_slug}\nRisco: {risk_score}\nFonte: {article.source}\nURL: {article.url}\nTítulo: {article.clean_title}\nTexto:\n{article.clean_text[:2600]}"
+    )
+    return request_id, prompt[:3900]
 
 
 def _extract_json(text: str) -> dict | None:
@@ -94,16 +59,10 @@ def _post_from_dict(data: dict, article: ArticleIntake) -> PublicPost:
 async def request_mira_public_post(bot: Bot, article: ArticleIntake, channel_slug: str, risk_score: int = 100) -> PublicPost:
     settings = get_settings()
     request_id, prompt = build_mira_prompt(article, channel_slug, risk_score)
-    loop = asyncio.get_running_loop()
-    future: asyncio.Future[str] = loop.create_future()
+    future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
     _PENDING[request_id] = future
-
     try:
-        sent = await bot.send_message(
-            chat_id=settings.mira_group_id,
-            text=prompt,
-            disable_web_page_preview=True,
-        )
+        sent = await bot.send_message(settings.mira_group_id, prompt, disable_web_page_preview=True)
         logger.info("mira_request_sent request_id=%s message_id=%s", request_id, sent.message_id)
         response_text = await asyncio.wait_for(future, timeout=settings.mira_timeout_seconds)
         data = _extract_json(response_text)
@@ -122,10 +81,8 @@ async def resolve_mira_response(reply_to_text: str | None, response_text: str | 
     match = re.search(r"ID do pedido:\s*([a-f0-9]{12})", reply_to_text, flags=re.IGNORECASE)
     if not match:
         return False
-    request_id = match.group(1)
-    future = _PENDING.get(request_id)
+    future = _PENDING.get(match.group(1))
     if not future or future.done():
         return False
     future.set_result(response_text)
-    logger.info("mira_response_received request_id=%s", request_id)
     return True
