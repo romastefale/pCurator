@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 
 from openai import AsyncOpenAI
@@ -6,6 +7,8 @@ from openai import AsyncOpenAI
 from app.services.editorial_schema import PUBLIC_POST_JSON_SCHEMA
 from app.settings import get_settings
 from app.types import ArticleIntake, PublicPost
+
+logger = logging.getLogger(__name__)
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -45,7 +48,7 @@ def _fallback_subtitle(article: ArticleIntake) -> str:
     return "A informação principal foi extraída da matéria e deve ser revisada antes da publicação."
 
 
-def _fallback_public_post(article: ArticleIntake, channel_slug: str) -> PublicPost:
+def _fallback_public_post(article: ArticleIntake, channel_slug: str, reason: str = "fallback_local_sem_ia") -> PublicPost:
     base_hashtags = ["Notícia", "Atualidade", "Curadoria"]
     if "copa" in f"{article.clean_title} {article.clean_text}".lower():
         base_hashtags = ["Notícia", "Copa2026", "SeleçãoBrasileira"]
@@ -60,7 +63,7 @@ def _fallback_public_post(article: ArticleIntake, channel_slug: str) -> PublicPo
         source_url=article.url,
         publishable=bool(article.clean_text),
         needs_review=True,
-        quality_notes=["fallback_local_sem_ia"],
+        quality_notes=[reason],
     )
 
 
@@ -80,7 +83,8 @@ def _post_from_dict(data: dict, article: ArticleIntake) -> PublicPost:
 async def generate_structured_public_post(article: ArticleIntake, channel_slug: str, risk_score: int = 100) -> PublicPost:
     settings = get_settings()
     if not settings.openai_key:
-        return _fallback_public_post(article, channel_slug)
+        logger.warning("OpenAI key missing; using local editorial fallback")
+        return _fallback_public_post(article, channel_slug, "openai_key_missing")
 
     channel_hint = (
         "Canal 1: leve, pop, cultura digital, celebridades, comportamento e entretenimento. Evite política, religião, crime pesado, tragédia e tema excessivamente sensível."
@@ -123,11 +127,12 @@ Texto limpo extraído:
                 {"role": "system", "content": "Você é um editor jornalístico para Telegram. Responda apenas no schema solicitado."},
                 {"role": "user", "content": prompt},
             ],
-            text={"format": {"type": "json_schema", "json_schema": PUBLIC_POST_JSON_SCHEMA}},
+            text={"format": {"type": "json_schema", **PUBLIC_POST_JSON_SCHEMA}},
             temperature=0.35,
         )
         content = response.output_text
         data = json.loads(content)
         return _post_from_dict(data, article)
-    except Exception:
-        return _fallback_public_post(article, channel_slug)
+    except Exception as exc:
+        logger.exception("OpenAI structured editorial generation failed: %s", type(exc).__name__)
+        return _fallback_public_post(article, channel_slug, f"openai_error:{type(exc).__name__}")
