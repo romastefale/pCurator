@@ -14,7 +14,7 @@ from app.storage.items import find_duplicate_item, save_item
 from app.storage.posts import save_post
 from app.storage.session import set_active_post
 from app.types import ArticleIntake
-from app.ui import channel_keyboard
+from app.ui import channel_keyboard, duplicate_keyboard
 
 router = Router()
 
@@ -76,7 +76,9 @@ async def handle_possible_link(message: Message) -> None:
             "⚠️ Matéria potencialmente duplicada detectada.\n\n"
             f"Item existente: #{duplicate['id']}\n"
             f"Título: {duplicate.get('title') or 'Sem título'}\n"
-            f"Fonte: {duplicate.get('source_name') or 'Web'}"
+            f"Fonte: {duplicate.get('source_name') or 'Web'}\n\n"
+            "Quer gerar um novo rascunho mesmo assim?",
+            reply_markup=duplicate_keyboard(),
         )
         return
 
