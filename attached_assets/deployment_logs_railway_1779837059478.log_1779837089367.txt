@@ -1,0 +1,113 @@
+2026-05-26T23:05:11.233948641Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/3234db31-b787-42dc-9117-6ac1c3bf367b/vol_zqe7oxu0xdthfyjm
+2026-05-26T23:05:11.234445717Z [info] Starting Container
+2026-05-26T23:05:14.392235649Z [error] 2026-05-26 23:05:13,344 INFO aiogram.dispatcher Start polling
+2026-05-26T23:05:14.392238550Z [error] 2026-05-26 23:05:13,774 INFO aiogram.dispatcher Run polling for bot @tigraoCURATORbot id=8752347723 - 'pCURATOR'
+2026-05-26T23:05:14.501501499Z [error] 2026-05-26 23:05:14,487 INFO aiogram.event Update id=632417675 is handled. Duration 566 ms by bot id=8752347723
+2026-05-26T23:05:14.507848111Z [error] 2026-05-26 23:05:14,504 INFO aiogram.event Update id=632417676 is handled. Duration 582 ms by bot id=8752347723
+2026-05-26T23:05:15.383482892Z [error] 2026-05-26 23:05:15,381 INFO aiogram.event Update id=632417674 is handled. Duration 1461 ms by bot id=8752347723
+2026-05-26T23:07:45.443256360Z [error] 2026-05-26 23:07:45,196 INFO aiogram.event Update id=632417677 is handled. Duration 789 ms by bot id=8752347723
+2026-05-26T23:07:52.142910843Z [error] 2026-05-26 23:07:51,500 INFO app.callbacks callback_received data=duplicate:regenerate:26 user=8505890439
+2026-05-26T23:07:52.146536890Z [error] 2026-05-26 23:07:52,076 INFO aiogram.event Update id=632417678 is handled. Duration 576 ms by bot id=8752347723
+2026-05-26T23:07:56.760599052Z [error] 2026-05-26 23:07:56,757 INFO app.callbacks callback_received data=channel:c1 user=8505890439
+2026-05-26T23:07:57.508470519Z [error] 2026-05-26 23:07:57,326 ERROR app.services.regenerator Mira editorial generation failed: RuntimeError
+2026-05-26T23:07:57.508473407Z [error] Traceback (most recent call last):
+2026-05-26T23:07:57.508476216Z [error]   File "/app/app/services/regenerator.py", line 51, in regenerate_post_for_channel
+2026-05-26T23:07:57.508479377Z [error]     public_post = await request_mira_public_post(bot, intake, channel_slug, risk_score=risk_score)
+2026-05-26T23:07:57.508482658Z [error]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:07:57.508485608Z [error]   File "/app/app/services/mira_bridge.py", line 74, in request_mira_public_post
+2026-05-26T23:07:57.508488691Z [error]     raise RuntimeError("mira_group_id_not_configured")
+2026-05-26T23:07:57.508492446Z [error] RuntimeError: mira_group_id_not_configured
+2026-05-26T23:08:04.858251290Z [error] 2026-05-26 23:08:04,842 INFO httpx HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-05-26T23:08:04.858258967Z [error] 2026-05-26 23:08:04,843 INFO openai._base_client Retrying request to /responses in 0.488288 seconds
+2026-05-26T23:08:09.688908622Z [error] 2026-05-26 23:08:09,687 INFO httpx HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-05-26T23:08:09.688912987Z [error] 2026-05-26 23:08:09,688 INFO openai._base_client Retrying request to /responses in 0.758598 seconds
+2026-05-26T23:08:17.678994513Z [error] 2026-05-26 23:08:17,418 INFO httpx HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-05-26T23:08:17.679005826Z [error] 2026-05-26 23:08:17,418 ERROR app.services.structured_editor OpenAI structured editorial generation failed: RateLimitError
+2026-05-26T23:08:17.679010823Z [error] Traceback (most recent call last):
+2026-05-26T23:08:17.679015368Z [error]   File "/app/app/services/structured_editor.py", line 124, in generate_structured_public_post
+2026-05-26T23:08:17.679019907Z [error]     response = await client.responses.create(
+2026-05-26T23:08:17.679024785Z [error]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.679030308Z [error]   File "/app/.venv/lib/python3.12/site-packages/openai/resources/responses/responses.py", line 2626, in create
+2026-05-26T23:08:17.679035023Z [error]     return await self._post(
+2026-05-26T23:08:17.679050966Z [error]            ^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.679056532Z [error]   File "/app/.venv/lib/python3.12/site-packages/openai/_base_client.py", line 1931, in post
+2026-05-26T23:08:17.679061515Z [error]     return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+2026-05-26T23:08:17.679065638Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.679069533Z [error]   File "/app/.venv/lib/python3.12/site-packages/openai/_base_client.py", line 1716, in request
+2026-05-26T23:08:17.679073968Z [error]     raise self._make_status_error_from_response(err.response) from None
+2026-05-26T23:08:17.679077937Z [error] openai.RateLimitError: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2026-05-26T23:08:17.901005430Z [error] 2026-05-26 23:08:17,898 INFO aiogram.event Update id=632417679 is not handled. Duration 21141 ms by bot id=8752347723
+2026-05-26T23:08:17.920041313Z [error] 2026-05-26 23:08:17,898 ERROR aiogram.event Cause exception while process update id=632417679 by bot id=8752347723
+2026-05-26T23:08:17.920047628Z [error] TelegramBadRequest: Telegram server says - Bad Request: wrong type of the web page content
+2026-05-26T23:08:17.920051451Z [error] Traceback (most recent call last):
+2026-05-26T23:08:17.920054807Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/dispatcher.py", line 320, in _process_update
+2026-05-26T23:08:17.920058091Z [error]     response = await self.feed_update(bot, update, **kwargs)
+2026-05-26T23:08:17.920061297Z [error]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.920064705Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/dispatcher.py", line 164, in feed_update
+2026-05-26T23:08:17.920068661Z [error]     response = await self.update.wrap_outer_middleware(
+2026-05-26T23:08:17.920072471Z [error]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.920075942Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/middlewares/error.py", line 27, in __call__
+2026-05-26T23:08:17.920079205Z [error]     return await handler(event, data)
+2026-05-26T23:08:17.920082753Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.920086651Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/middlewares/user_context.py", line 58, in __call__
+2026-05-26T23:08:17.920090026Z [error]     return await handler(event, data)
+2026-05-26T23:08:17.920093597Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.920096961Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/fsm/middleware.py", line 43, in __call__
+2026-05-26T23:08:17.920100391Z [error]     return await handler(event, data)
+2026-05-26T23:08:17.920105676Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.920109542Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/event/telegram.py", line 126, in trigger
+2026-05-26T23:08:17.921850667Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/router.py", line 157, in _wrapped
+2026-05-26T23:08:17.921867139Z [error]     return await self._propagate_event(
+2026-05-26T23:08:17.921872245Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.921876049Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/router.py", line 193, in _propagate_event
+2026-05-26T23:08:17.921879124Z [error]     response = await router.propagate_event(update_type=update_type, event=event, **kwargs)
+2026-05-26T23:08:17.921883092Z [error]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.921888840Z [error]     return await wrapped_inner(event, kwargs)
+2026-05-26T23:08:17.921888936Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/router.py", line 165, in propagate_event
+2026-05-26T23:08:17.921893872Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.921897035Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/event/handler.py", line 71, in call
+2026-05-26T23:08:17.921901688Z [error]     return await wrapped()
+2026-05-26T23:08:17.921905667Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.921908884Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/dispatcher.py", line 283, in _listen_update
+2026-05-26T23:08:17.921912486Z [error]     return await self.propagate_event(update_type=update_type, event=event, **kwargs)
+2026-05-26T23:08:17.921915878Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.921919567Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/router.py", line 165, in propagate_event
+2026-05-26T23:08:17.921922938Z [error]     return await observer.wrap_outer_middleware(_wrapped, event=event, data=kwargs)
+2026-05-26T23:08:17.921925945Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.923264234Z [error]     return await observer.wrap_outer_middleware(_wrapped, event=event, data=kwargs)
+2026-05-26T23:08:17.923269940Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.923273582Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/router.py", line 157, in _wrapped
+2026-05-26T23:08:17.923277294Z [error]     return await self._propagate_event(
+2026-05-26T23:08:17.923281883Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.923285338Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/router.py", line 185, in _propagate_event
+2026-05-26T23:08:17.923288335Z [error]     response = await observer.trigger(event, **kwargs)
+2026-05-26T23:08:17.923291479Z [error]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.923294600Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/event/telegram.py", line 126, in trigger
+2026-05-26T23:08:17.923300440Z [error]     return await wrapped_inner(event, kwargs)
+2026-05-26T23:08:17.923303929Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.923306961Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/dispatcher/event/handler.py", line 71, in call
+2026-05-26T23:08:17.923310223Z [error]     return await wrapped()
+2026-05-26T23:08:17.923313428Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.923316356Z [error]   File "/app/app/callbacks.py", line 205, in choose_c1
+2026-05-26T23:08:17.923319403Z [error]     await _prepare_channel_review(callback, "c1", "📘 Canal 1")
+2026-05-26T23:08:17.923322582Z [error]   File "/app/app/callbacks.py", line 122, in _prepare_channel_review
+2026-05-26T23:08:17.923325686Z [error]     await send_post_preview(callback.bot, callback.message.chat.id, post)
+2026-05-26T23:08:17.923328932Z [error]   File "/app/app/services/preview.py", line 6, in send_post_preview
+2026-05-26T23:08:17.924887158Z [error]     raise TelegramBadRequest(method=method, message=description)
+2026-05-26T23:08:17.924892366Z [error] aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: wrong type of the web page content
+2026-05-26T23:08:17.924951509Z [error]     await publish_post(bot, chat_id, post)
+2026-05-26T23:08:17.924957025Z [error]   File "/app/app/services/publisher.py", line 43, in publish_post
+2026-05-26T23:08:17.924962048Z [error]     await bot.send_photo(chat_id=chat_id, photo=image_ref, caption=caption)
+2026-05-26T23:08:17.924967237Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/client/bot.py", line 3016, in send_photo
+2026-05-26T23:08:17.924971639Z [error]     return await self(call, request_timeout=request_timeout)
+2026-05-26T23:08:17.924974756Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.924978460Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/client/bot.py", line 504, in __call__
+2026-05-26T23:08:17.924981989Z [error]     return await self.session(self, method, timeout=request_timeout)
+2026-05-26T23:08:17.924985259Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.924991137Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/client/session/base.py", line 259, in __call__
+2026-05-26T23:08:17.924994765Z [error]     return cast(TelegramType, await middleware(bot, method))
+2026-05-26T23:08:17.924999169Z [error]                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.925002233Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/client/session/aiohttp.py", line 177, in make_request
+2026-05-26T23:08:17.925005197Z [error]     response = self.check_response(
+2026-05-26T23:08:17.925007994Z [error]                ^^^^^^^^^^^^^^^^^^^^
+2026-05-26T23:08:17.925010661Z [error]   File "/app/.venv/lib/python3.12/site-packages/aiogram/client/session/base.py", line 121, in check_response
