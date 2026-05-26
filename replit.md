@@ -6,6 +6,17 @@ Bot de Telegram para curadoria editorial automatizada (Python 3.12, aiogram).
 
 - **Deploy em produção: Railway.** Este bot já roda no Railway — não configurar deployment no Replit nem sugerir publish. O Replit é apenas ambiente de desenvolvimento/edição.
 - Idioma de comunicação: português.
+- **Sempre usar as versões mais recentes** de aiogram e Telegram Bot API ao propor mudanças.
+
+## Versões de referência (última checagem: 26/05/2026)
+
+- **aiogram**: `3.28.2` (PyPI, lançada em 10/05/2026). Suporta Python `>=3.10, <3.15`.
+- **Telegram Bot API**: `9.5` (changelog oficial, maio/2026).
+- **Python (runtime do projeto)**: 3.12.3 (compatível).
+- Deprecações relevantes vigentes em aiogram 3.7+:
+  - `disable_web_page_preview=True` → usar `link_preview_options=LinkPreviewOptions(is_disabled=True)`.
+  - `parse_mode=...` direto no `Bot(...)` → usar `default=DefaultBotProperties(parse_mode=ParseMode.HTML, link_preview_options=LinkPreviewOptions(is_disabled=True))`.
+  - O kwarg antigo ainda funciona, mas emite `DeprecationWarning`.
 
 ## Overview
 
