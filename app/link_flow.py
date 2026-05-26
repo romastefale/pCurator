@@ -6,6 +6,7 @@ from aiogram.types import Message
 from app.access import reject_message_if_not_owner
 from app.services.article_extractor_v2 import extract_article_intake
 from app.services.fetcher import fetch_html
+from app.services.image_validation import head_confirms_image
 from app.services.linkpreview import fetch_linkpreview
 from app.services.risk import assess_link_risk
 from app.services.text_utils import clean_url, stable_hash
@@ -62,6 +63,12 @@ async def handle_possible_link(message: Message) -> None:
             "Não consegui obter título ou texto suficiente para criar rascunho.",
         )
         return
+
+    # HEAD HTTP real: confirma Content-Type image/* antes de salvar. Sem isso,
+    # URLs quebradas/HTML/placeholder geram silenciosamente prévia sem imagem
+    # (link_preview do Telegram falha sem aviso) ou erro 'wrong type of the web page content'.
+    if intake.image_url and not await head_confirms_image(intake.image_url):
+        intake.image_url = None
 
     text_hash = stable_hash(intake.clean_text if intake.clean_text else canonical_url)
 

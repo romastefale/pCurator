@@ -1,6 +1,7 @@
 import logging
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
 from app.access import reject_callback_if_not_owner
@@ -17,7 +18,13 @@ from app.storage.posts import (
     update_post_channel_slug,
     update_post_status,
 )
-from app.storage.session import get_active_context, get_active_post, set_active_post
+from app.storage.session import (
+    get_active_context,
+    get_active_post,
+    pop_last_preview_message_ids,
+    set_active_post,
+    set_last_preview_message_ids,
+)
 from app.ui import (
     channel_keyboard,
     channel_label,
@@ -28,6 +35,16 @@ from app.ui import (
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+
+async def _delete_tracked_previews(bot: Bot, chat_id: int, user_id: int) -> None:
+    settings = get_settings()
+    ids = await pop_last_preview_message_ids(settings.database_path, user_id)
+    for message_id in ids:
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except TelegramBadRequest:
+            pass
 
 
 def _log_callback_received(callback: CallbackQuery) -> None:
@@ -118,12 +135,14 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
     )
     post = await get_post(settings.database_path, post_id)
 
+    tracked: list[int] = []
     if metadata.get("ok") and post:
-        await send_post_preview(callback.bot, callback.message.chat.id, post)
+        tracked.extend(await send_post_preview(callback.bot, callback.message.chat.id, post))
 
     warning = _generation_warning(metadata)
     if warning:
-        await callback.message.answer(warning)
+        warn_msg = await callback.message.answer(warning)
+        tracked.append(warn_msg.message_id)
 
     can_publish = bool(metadata.get("ok")) and bool(metadata.get("publishable", True))
     instruction = (
@@ -133,7 +152,11 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
         else f"⚠️ Rascunho marcado como não publicável automaticamente (tom de {label}).\n"
         "Edite o texto ou troque a imagem antes de avançar."
     )
-    await callback.message.answer(instruction, reply_markup=review_keyboard(can_publish=can_publish))
+    instr_msg = await callback.message.answer(
+        instruction, reply_markup=review_keyboard(can_publish=can_publish)
+    )
+    tracked.append(instr_msg.message_id)
+    await set_last_preview_message_ids(settings.database_path, callback.from_user.id, tracked)
 
 
 @router.callback_query(F.data.regexp(r"^duplicate:regenerate:\d+$"))
@@ -315,15 +338,19 @@ async def _prepare_destination_confirm(callback: CallbackQuery, destination_slug
     if tone_slug and tone_slug != destination_slug:
         tone_note = f" (gerado com tom de {channel_label(tone_slug)})"
 
-    await callback.message.answer(
+    tracked: list[int] = []
+    header = await callback.message.answer(
         f"🔎 Pré-visualização final para {dest_label}{tone_note} — post #{post_id}.\n"
         "Esta é exatamente a forma como será enviada:"
     )
-    await send_post_preview(callback.bot, callback.message.chat.id, post)
-    await callback.message.answer(
+    tracked.append(header.message_id)
+    tracked.extend(await send_post_preview(callback.bot, callback.message.chat.id, post))
+    confirm_msg = await callback.message.answer(
         f"Confirma o envio para {dest_label}?",
         reply_markup=confirm_keyboard(post_id, destination_slug),
     )
+    tracked.append(confirm_msg.message_id)
+    await set_last_preview_message_ids(settings.database_path, callback.from_user.id, tracked)
 
 
 @router.callback_query(F.data == "dest:c1")
@@ -524,6 +551,9 @@ async def review_edit(callback: CallbackQuery) -> None:
             await callback.message.answer("Nenhum rascunho ativo encontrado.")
             return
         settings = get_settings()
+        await _delete_tracked_previews(
+            callback.bot, callback.message.chat.id, callback.from_user.id
+        )
         await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=post_id, mode="edit_text")
         await callback.message.answer(f"✏️ Envie o novo texto da legenda para substituir o post #{post_id}.")
 
@@ -542,6 +572,9 @@ async def review_image(callback: CallbackQuery) -> None:
             await callback.message.answer("Nenhum rascunho ativo encontrado.")
             return
         settings = get_settings()
+        await _delete_tracked_previews(
+            callback.bot, callback.message.chat.id, callback.from_user.id
+        )
         await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=post_id, mode="edit_image")
         await callback.message.answer(f"🖼 Envie a nova imagem para o post #{post_id}.")
 

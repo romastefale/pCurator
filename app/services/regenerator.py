@@ -3,6 +3,7 @@ import logging
 from aiogram import Bot
 
 from app.services.article_cleaner import clean_extracted_text, compact_source_name, normalize_title
+from app.services.image_validation import head_confirms_image
 from app.services.mira_bridge import request_mira_public_post
 from app.services.post_validator import force_review, validate_public_post
 from app.services.structured_editor import generate_structured_public_post
@@ -65,7 +66,11 @@ async def regenerate_post_for_channel(
     await update_post_caption(database_path, post_id, caption_html)
 
     if intake.image_url:
-        await update_post_image(database_path, post_id, intake.image_url)
+        if await head_confirms_image(intake.image_url):
+            await update_post_image(database_path, post_id, intake.image_url)
+        else:
+            await update_post_image(database_path, post_id, None)
+            public_post.quality_notes.append("image_head_invalid")
 
     quality_notes = list(public_post.quality_notes)
     engine = _engine_from_notes(quality_notes)

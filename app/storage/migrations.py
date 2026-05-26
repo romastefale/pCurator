@@ -18,5 +18,7 @@ async def apply_migrations(database_path: str) -> None:
         session_columns = await _columns(db, "editorial_sessions")
         if "active_channel_slug" not in session_columns:
             await db.execute("ALTER TABLE editorial_sessions ADD COLUMN active_channel_slug TEXT")
+        if "last_preview_message_ids" not in session_columns:
+            await db.execute("ALTER TABLE editorial_sessions ADD COLUMN last_preview_message_ids TEXT")
 
         await db.commit()

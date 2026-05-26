@@ -41,7 +41,7 @@ async def update_post_caption(database_path: str, post_id: int, caption_html: st
         await db.commit()
 
 
-async def update_post_image(database_path: str, post_id: int, image_url: str) -> None:
+async def update_post_image(database_path: str, post_id: int, image_url: str | None) -> None:
     async with aiosqlite.connect(database_path) as db:
         await db.execute(
             "UPDATE posts SET image_url = ? WHERE id = ?",

@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS editorial_sessions (
     active_post_id INTEGER,
     active_channel_slug TEXT,
     mode TEXT,
+    last_preview_message_ids TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

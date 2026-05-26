@@ -1,3 +1,5 @@
+import json
+
 import aiosqlite
 
 
@@ -52,6 +54,39 @@ async def get_active_post(database_path: str, user_id: int) -> tuple[int | None,
         if not row:
             return None, None
         return row[0], row[1]
+
+
+async def set_last_preview_message_ids(
+    database_path: str, user_id: int, message_ids: list[int]
+) -> None:
+    payload = json.dumps(message_ids) if message_ids else None
+    async with aiosqlite.connect(database_path) as db:
+        await db.execute(
+            "UPDATE editorial_sessions SET last_preview_message_ids = ? WHERE user_id = ?",
+            (payload, user_id),
+        )
+        await db.commit()
+
+
+async def pop_last_preview_message_ids(database_path: str, user_id: int) -> list[int]:
+    async with aiosqlite.connect(database_path) as db:
+        cursor = await db.execute(
+            "SELECT last_preview_message_ids FROM editorial_sessions WHERE user_id = ?",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        if not row or not row[0]:
+            return []
+        await db.execute(
+            "UPDATE editorial_sessions SET last_preview_message_ids = NULL WHERE user_id = ?",
+            (user_id,),
+        )
+        await db.commit()
+        try:
+            ids = json.loads(row[0])
+            return [int(x) for x in ids if isinstance(x, (int, str))]
+        except (ValueError, TypeError):
+            return []
 
 
 async def get_active_context(database_path: str, user_id: int) -> tuple[int | None, str | None, str | None]:
