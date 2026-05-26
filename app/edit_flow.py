@@ -23,7 +23,8 @@ async def handle_edit_text(message: Message) -> None:
     if await reject_message_if_not_owner(message):
         return
 
-    await update_post_caption(settings.database_path, post_id, message.text)
+    new_caption = message.html_text if message.text else (message.caption or "")
+    await update_post_caption(settings.database_path, post_id, new_caption)
     await log_event(
         settings.database_path,
         event_type="caption_updated",
