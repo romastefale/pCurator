@@ -2,9 +2,10 @@ from aiogram import F, Router
 from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
+from app.services.preview import send_post_preview
 from app.settings import get_settings
 from app.storage.events import log_event
-from app.storage.posts import update_post_image
+from app.storage.posts import get_post, update_post_image
 from app.storage.session import get_active_post, set_active_post
 from app.ui import review_keyboard
 
@@ -36,7 +37,11 @@ async def handle_manual_image(message: Message) -> None:
         mode="review",
     )
 
+    await message.answer(f"🖼 Imagem do post #{post_id} atualizada. Veja como vai ficar:")
+    post = await get_post(settings.database_path, post_id)
+    if post:
+        await send_post_preview(message.bot, message.chat.id, post)
     await message.answer(
-        f"🖼 Imagem do post #{post_id} atualizada. Revise antes de publicar.",
+        "Confirme a publicação ou edite novamente.",
         reply_markup=review_keyboard(),
     )

@@ -27,7 +27,6 @@ def render_public_post_html(post: PublicPost) -> str:
     title = html.escape(_compact_inline(post.title))
     subtitle = html.escape(_compact_inline(post.subtitle))
     body = html.escape(_compact_inline(post.body))
-    source_url = html.escape(_compact_inline(post.source_url), quote=True)
 
     sections = [
         hashtags_line,
@@ -37,7 +36,5 @@ def render_public_post_html(post: PublicPost) -> str:
     ]
 
     text = "\n\n".join(section for section in sections if section.strip())
-    if source_url:
-        text += f"<a href=\"{source_url}\">&#8203;</a>"
 
     return _normalize_post_spacing(text)

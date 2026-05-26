@@ -23,6 +23,7 @@ async def publish_post(bot: Bot, chat_id: int, post: dict) -> None:
             chat_id=chat_id,
             text=caption,
             parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
         )
         return
 
@@ -30,4 +31,5 @@ async def publish_post(bot: Bot, chat_id: int, post: dict) -> None:
         chat_id=chat_id,
         text=caption,
         parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
     )

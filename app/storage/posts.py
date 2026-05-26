@@ -50,6 +50,17 @@ async def update_post_status(database_path: str, post_id: int, status: str) -> N
         await db.commit()
 
 
+async def try_lock_post_for_publish(database_path: str, post_id: int) -> bool:
+    """Transição atômica draft -> publishing. Retorna True se ganhou a trava."""
+    async with aiosqlite.connect(database_path) as db:
+        cursor = await db.execute(
+            "UPDATE posts SET status = 'publishing' WHERE id = ? AND status = 'draft'",
+            (post_id,),
+        )
+        await db.commit()
+        return cursor.rowcount == 1
+
+
 async def get_post(database_path: str, post_id: int) -> dict | None:
     async with aiosqlite.connect(database_path) as db:
         db.row_factory = aiosqlite.Row

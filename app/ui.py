@@ -23,6 +23,18 @@ def review_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_button(text="✅ CONFIRMAR ENVIO", callback_data="post:confirm", style="success")],
+            [
+                _button(text="✏️ EDT", callback_data="post:edit", style="primary"),
+                _button(text="🚫 CANCELAR", callback_data="post:cancel_confirm", style="danger"),
+            ],
+        ]
+    )
+
+
 def channel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

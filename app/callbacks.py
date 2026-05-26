@@ -10,9 +10,9 @@ from app.services.regenerator import regenerate_post_for_channel
 from app.settings import get_settings
 from app.storage.articles import get_article
 from app.storage.events import log_event
-from app.storage.posts import get_post, save_post, update_post_status
+from app.storage.posts import get_post, save_post, try_lock_post_for_publish, update_post_status
 from app.storage.session import get_active_context, get_active_post, set_active_post
-from app.ui import channel_keyboard, review_keyboard
+from app.ui import channel_keyboard, confirm_keyboard, review_keyboard
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -214,7 +214,7 @@ async def review_publish(callback: CallbackQuery) -> None:
     settings = get_settings()
     post_id, channel_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
     await _log_choice(callback, channel_slug, "publish_requested")
-    await callback.answer("Publicação solicitada")
+    await callback.answer("Revise antes de confirmar")
 
     if not callback.message:
         return
@@ -233,11 +233,121 @@ async def review_publish(callback: CallbackQuery) -> None:
         await callback.message.answer("Post ativo não encontrado no banco.")
         return
 
-    await publish_post(callback.bot, channel_id, post)
+    if post.get("status") == "published":
+        await callback.message.answer(f"⚠️ Post #{post_id} já foi publicado anteriormente.")
+        return
+
+    await set_active_post(
+        settings.database_path,
+        user_id=callback.from_user.id,
+        post_id=post_id,
+        mode="confirm",
+        channel_slug=channel_slug,
+    )
+
+    channel_label = "📘 Canal 1" if channel_slug == "c1" else "📰 Canal 2"
+    await callback.message.answer(
+        f"🔎 Pré-visualização final para {channel_label} (post #{post_id}).\n"
+        "Esta é exatamente a forma como será enviada:"
+    )
+    await send_post_preview(callback.bot, callback.message.chat.id, post)
+    await callback.message.answer(
+        "Confirma o envio para o canal?",
+        reply_markup=confirm_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "post:confirm")
+async def review_confirm(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+
+    settings = get_settings()
+    post_id, channel_slug, mode = await get_active_context(settings.database_path, callback.from_user.id)
+    await callback.answer("Enviando...")
+
+    if not callback.message:
+        return
+
+    if post_id is None or mode != "confirm":
+        await callback.message.answer("Nenhuma confirmação pendente. Reabra o rascunho.")
+        return
+
+    channel_id = _resolve_channel_id(channel_slug)
+    if channel_id is None:
+        await callback.message.answer("Canal de destino não configurado para este rascunho.")
+        return
+
+    post = await get_post(settings.database_path, post_id)
+    if not post:
+        await callback.message.answer("Post ativo não encontrado no banco.")
+        return
+
+    current_status = post.get("status")
+    if current_status in ("published", "publishing", "failed"):
+        await callback.message.answer(
+            f"⚠️ Post #{post_id} está com status '{current_status}'. Envio bloqueado por segurança."
+        )
+        await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+        return
+
+    # Trava atômica draft -> publishing. Se já foi tomada, recusa.
+    locked = await try_lock_post_for_publish(settings.database_path, post_id)
+    if not locked:
+        await callback.message.answer(
+            f"⚠️ Post #{post_id} já está em envio ou foi publicado. Verifique o canal antes de tentar de novo."
+        )
+        await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+        return
+
+    try:
+        await publish_post(callback.bot, channel_id, post)
+    except Exception as exc:
+        logger.exception("Publish failed for post %s: %s", post_id, type(exc).__name__)
+        # Deixa como 'failed' (não volta pra draft) — o envio pode ter saído parcial
+        # e marcar como draft permitiria re-publicação acidental.
+        await update_post_status(settings.database_path, post_id, "failed")
+        await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+        await _log_choice(callback, channel_slug, "publish_failed")
+        await callback.message.answer(
+            f"❌ Falha ao publicar post #{post_id}: {type(exc).__name__}.\n"
+            "⚠️ Verifique o canal antes de tentar de novo — parte do conteúdo pode ter sido enviada.\n"
+            "O post ficou marcado como 'failed'."
+        )
+        return
+
     await update_post_status(settings.database_path, post_id, "published")
     await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
     await _log_choice(callback, channel_slug, "published")
     await callback.message.answer(f"✅ Post #{post_id} publicado.")
+
+
+@router.callback_query(F.data == "post:cancel_confirm")
+async def review_cancel_confirm(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+
+    settings = get_settings()
+    post_id, channel_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
+    await _log_choice(callback, channel_slug, "confirm_cancelled")
+    await callback.answer("Confirmação cancelada")
+
+    if post_id is not None:
+        await set_active_post(
+            settings.database_path,
+            user_id=callback.from_user.id,
+            post_id=post_id,
+            mode="review",
+            channel_slug=channel_slug,
+        )
+
+    if callback.message:
+        await callback.message.answer(
+            "Envio cancelado. O rascunho continua disponível.",
+            reply_markup=review_keyboard(),
+        )
 
 
 @router.callback_query(F.data == "post:edit")
