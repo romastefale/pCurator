@@ -1,0 +1,13 @@
+2026-05-26T23:22:26.878208272Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/582a969e-8812-46c6-8bec-b78b20e1596d/vol_zqe7oxu0xdthfyjm
+2026-05-26T23:22:28.676988603Z [info] Starting Container
+2026-05-26T23:22:30.569002266Z [error] 2026-05-26 23:22:29,505 INFO aiogram.dispatcher Start polling
+2026-05-26T23:22:30.569007828Z [error] 2026-05-26 23:22:29,935 INFO aiogram.dispatcher Run polling for bot @tigraoCURATORbot id=8752347723 - 'pCURATOR'
+2026-05-26T23:23:20.292170131Z [error] 2026-05-26 23:23:16,122 INFO aiogram.event Update id=632417680 is handled. Duration 568 ms by bot id=8752347723
+2026-05-26T23:23:24.911921310Z [error] 2026-05-26 23:23:24,862 INFO aiogram.event Update id=632417681 is handled. Duration 694 ms by bot id=8752347723
+2026-05-26T23:23:27.285321813Z [error] 2026-05-26 23:23:27,281 INFO app.callbacks callback_received data=duplicate:regenerate:26 user=8505890439
+2026-05-26T23:23:27.912011876Z [error] 2026-05-26 23:23:27,862 INFO aiogram.event Update id=632417682 is handled. Duration 581 ms by bot id=8752347723
+2026-05-26T23:23:30.916308796Z [error] 2026-05-26 23:23:30,886 INFO app.callbacks callback_received data=channel:c1 user=8505890439
+2026-05-26T23:23:31.909843929Z [error] 2026-05-26 23:23:31,748 INFO app.services.mira_bridge mira_request_sent request_id=230b3f4e137c message_id=1212
+2026-05-26T23:23:51.586198264Z [error] 2026-05-26 23:23:47,053 INFO app.services.mira_bridge mira_response_resolved request_id=230b3f4e137c
+2026-05-26T23:23:51.586201857Z [error] 2026-05-26 23:23:47,056 INFO aiogram.event Update id=632417684 is handled. Duration 2 ms by bot id=8752347723
+2026-05-26T23:23:51.586206292Z [error] 2026-05-26 23:23:47,633 INFO aiogram.event Update id=632417683 is handled. Duration 16747 ms by bot id=8752347723
