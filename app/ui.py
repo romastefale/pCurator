@@ -1,35 +1,27 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def _button(*, text: str, callback_data: str, style: str | None = None) -> InlineKeyboardButton:
-    try:
-        return InlineKeyboardButton(text=text, callback_data=callback_data, style=style)
-    except TypeError:
-        return InlineKeyboardButton(text=text, callback_data=callback_data)
-
-
-def review_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                _button(text="✅ PUB", callback_data="post:publish", style="success"),
-                _button(text="✏️ EDT", callback_data="post:edit", style="primary"),
-            ],
-            [
-                _button(text="🖼 IMG", callback_data="post:image", style="primary"),
-                _button(text="🚫 IGN", callback_data="post:ignore", style="danger"),
-            ],
+def review_keyboard(can_publish: bool = True) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if can_publish:
+        rows.append([InlineKeyboardButton(text="✅ Publicar", callback_data="post:publish")])
+    rows.append(
+        [
+            InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
+            InlineKeyboardButton(text="🖼 Trocar imagem", callback_data="post:image"),
         ]
     )
+    rows.append([InlineKeyboardButton(text="🚫 Ignorar", callback_data="post:ignore")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def confirm_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [_button(text="✅ CONFIRMAR ENVIO", callback_data="post:confirm", style="success")],
+            [InlineKeyboardButton(text="✅ Confirmar envio", callback_data="post:confirm")],
             [
-                _button(text="✏️ EDT", callback_data="post:edit", style="primary"),
-                _button(text="🚫 CANCELAR", callback_data="post:cancel_confirm", style="danger"),
+                InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
+                InlineKeyboardButton(text="🚫 Cancelar", callback_data="post:cancel_confirm"),
             ],
         ]
     )
@@ -39,10 +31,10 @@ def channel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                _button(text="📘 C1", callback_data="channel:c1", style="primary"),
-                _button(text="📰 C2", callback_data="channel:c2", style="primary"),
+                InlineKeyboardButton(text="📘 Canal 1", callback_data="channel:c1"),
+                InlineKeyboardButton(text="📰 Canal 2", callback_data="channel:c2"),
             ],
-            [_button(text="🚫 IGN", callback_data="channel:ignore", style="danger")],
+            [InlineKeyboardButton(text="🚫 Ignorar", callback_data="channel:ignore")],
         ]
     )
 
@@ -51,8 +43,16 @@ def duplicate_keyboard(article_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                _button(text="🔁 GERAR", callback_data=f"duplicate:regenerate:{article_id}", style="primary"),
-                _button(text="🚫 IGN", callback_data="duplicate:ignore", style="danger"),
+                InlineKeyboardButton(text="🔁 Gerar novamente", callback_data=f"duplicate:regenerate:{article_id}"),
+                InlineKeyboardButton(text="🚫 Ignorar", callback_data="duplicate:ignore"),
             ]
         ]
     )
+
+
+def channel_label(channel_slug: str | None) -> str:
+    if channel_slug == "c1":
+        return "📘 Canal 1"
+    if channel_slug == "c2":
+        return "📰 Canal 2"
+    return "canal não definido"

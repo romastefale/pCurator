@@ -8,21 +8,37 @@ async def set_active_post(
     post_id: int | None,
     mode: str | None = None,
     channel_slug: str | None = None,
+    clear_channel: bool = False,
 ) -> None:
     async with aiosqlite.connect(database_path) as db:
-        await db.execute(
-            """
-            INSERT INTO editorial_sessions
-                (user_id, active_post_id, active_channel_slug, mode, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(user_id) DO UPDATE SET
-                active_post_id = excluded.active_post_id,
-                active_channel_slug = COALESCE(excluded.active_channel_slug, active_channel_slug),
-                mode = excluded.mode,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (user_id, post_id, channel_slug, mode),
-        )
+        if clear_channel:
+            await db.execute(
+                """
+                INSERT INTO editorial_sessions
+                    (user_id, active_post_id, active_channel_slug, mode, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    active_post_id = excluded.active_post_id,
+                    active_channel_slug = NULL,
+                    mode = excluded.mode,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (user_id, post_id, None, mode),
+            )
+        else:
+            await db.execute(
+                """
+                INSERT INTO editorial_sessions
+                    (user_id, active_post_id, active_channel_slug, mode, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    active_post_id = excluded.active_post_id,
+                    active_channel_slug = COALESCE(excluded.active_channel_slug, active_channel_slug),
+                    mode = excluded.mode,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (user_id, post_id, channel_slug, mode),
+            )
         await db.commit()
 
 

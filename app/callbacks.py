@@ -12,7 +12,7 @@ from app.storage.articles import get_article
 from app.storage.events import log_event
 from app.storage.posts import get_post, save_post, try_lock_post_for_publish, update_post_status
 from app.storage.session import get_active_context, get_active_post, set_active_post
-from app.ui import channel_keyboard, confirm_keyboard, review_keyboard
+from app.ui import channel_keyboard, channel_label, confirm_keyboard, review_keyboard
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -109,10 +109,14 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
     if warning:
         await callback.message.answer(warning)
 
-    await callback.message.answer(
-        "Revise o rascunho antes de publicar.",
-        reply_markup=review_keyboard(),
+    can_publish = bool(metadata.get("ok")) and bool(metadata.get("publishable", True))
+    instruction = (
+        f"Revise o rascunho para {label} antes de publicar."
+        if can_publish
+        else f"⚠️ Rascunho marcado como não publicável automaticamente para {label}.\n"
+        "Edite o texto ou troque a imagem antes de tentar publicar."
     )
+    await callback.message.answer(instruction, reply_markup=review_keyboard(can_publish=can_publish))
 
 
 @router.callback_query(F.data.regexp(r"^duplicate:regenerate:\d+$"))
@@ -199,7 +203,13 @@ async def ignore_channel(callback: CallbackQuery) -> None:
 
     await _log_choice(callback, None, "channel_ignored")
     settings = get_settings()
-    await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+    await set_active_post(
+        settings.database_path,
+        user_id=callback.from_user.id,
+        post_id=None,
+        mode=None,
+        clear_channel=True,
+    )
     await callback.answer("Ignorado")
     if callback.message:
         await callback.message.answer("🚫 Rascunho ignorado.")
@@ -233,8 +243,10 @@ async def review_publish(callback: CallbackQuery) -> None:
         await callback.message.answer("Post ativo não encontrado no banco.")
         return
 
-    if post.get("status") == "published":
-        await callback.message.answer(f"⚠️ Post #{post_id} já foi publicado anteriormente.")
+    if post.get("status") in ("published", "publishing", "failed"):
+        await callback.message.answer(
+            f"⚠️ Post #{post_id} está com status '{post.get('status')}'. Envio bloqueado por segurança."
+        )
         return
 
     await set_active_post(
@@ -245,14 +257,14 @@ async def review_publish(callback: CallbackQuery) -> None:
         channel_slug=channel_slug,
     )
 
-    channel_label = "📘 Canal 1" if channel_slug == "c1" else "📰 Canal 2"
+    label = channel_label(channel_slug)
     await callback.message.answer(
-        f"🔎 Pré-visualização final para {channel_label} (post #{post_id}).\n"
+        f"🔎 Pré-visualização final para {label} (post #{post_id}).\n"
         "Esta é exatamente a forma como será enviada:"
     )
     await send_post_preview(callback.bot, callback.message.chat.id, post)
     await callback.message.answer(
-        "Confirma o envio para o canal?",
+        f"Confirma o envio para {label}?",
         reply_markup=confirm_keyboard(),
     )
 
@@ -289,7 +301,13 @@ async def review_confirm(callback: CallbackQuery) -> None:
         await callback.message.answer(
             f"⚠️ Post #{post_id} está com status '{current_status}'. Envio bloqueado por segurança."
         )
-        await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+        await set_active_post(
+            settings.database_path,
+            user_id=callback.from_user.id,
+            post_id=None,
+            mode=None,
+            clear_channel=True,
+        )
         return
 
     # Trava atômica draft -> publishing. Se já foi tomada, recusa.
@@ -298,7 +316,13 @@ async def review_confirm(callback: CallbackQuery) -> None:
         await callback.message.answer(
             f"⚠️ Post #{post_id} já está em envio ou foi publicado. Verifique o canal antes de tentar de novo."
         )
-        await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+        await set_active_post(
+            settings.database_path,
+            user_id=callback.from_user.id,
+            post_id=None,
+            mode=None,
+            clear_channel=True,
+        )
         return
 
     try:
@@ -308,19 +332,34 @@ async def review_confirm(callback: CallbackQuery) -> None:
         # Deixa como 'failed' (não volta pra draft) — o envio pode ter saído parcial
         # e marcar como draft permitiria re-publicação acidental.
         await update_post_status(settings.database_path, post_id, "failed")
-        await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+        await set_active_post(
+            settings.database_path,
+            user_id=callback.from_user.id,
+            post_id=None,
+            mode=None,
+            clear_channel=True,
+        )
         await _log_choice(callback, channel_slug, "publish_failed")
         await callback.message.answer(
-            f"❌ Falha ao publicar post #{post_id}: {type(exc).__name__}.\n"
+            f"❌ Falha ao publicar post #{post_id} em {channel_label(channel_slug)}: {type(exc).__name__}.\n"
             "⚠️ Verifique o canal antes de tentar de novo — parte do conteúdo pode ter sido enviada.\n"
-            "O post ficou marcado como 'failed'."
+            f"O post ficou marcado como 'failed'. Use <code>/pfr {post_id}</code> para reabrir após verificar."
         )
         return
 
     await update_post_status(settings.database_path, post_id, "published")
-    await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+    await set_active_post(
+        settings.database_path,
+        user_id=callback.from_user.id,
+        post_id=None,
+        mode=None,
+        clear_channel=True,
+    )
     await _log_choice(callback, channel_slug, "published")
-    await callback.message.answer(f"✅ Post #{post_id} publicado.")
+    await callback.message.answer(
+        f"✅ Post #{post_id} publicado em {channel_label(channel_slug)}.\n"
+        "Envie o próximo link quando quiser."
+    )
 
 
 @router.callback_query(F.data == "post:cancel_confirm")
@@ -345,7 +384,7 @@ async def review_cancel_confirm(callback: CallbackQuery) -> None:
 
     if callback.message:
         await callback.message.answer(
-            "Envio cancelado. O rascunho continua disponível.",
+            f"Envio para {channel_label(channel_slug)} cancelado. O rascunho continua disponível.",
             reply_markup=review_keyboard(),
         )
 
@@ -394,7 +433,13 @@ async def review_ignore(callback: CallbackQuery) -> None:
 
     await _log_choice(callback, None, "post_ignored")
     settings = get_settings()
-    await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=None, mode=None)
+    await set_active_post(
+        settings.database_path,
+        user_id=callback.from_user.id,
+        post_id=None,
+        mode=None,
+        clear_channel=True,
+    )
     await callback.answer("Ignorado")
     if callback.message:
         await callback.message.answer("🚫 Rascunho ignorado.")

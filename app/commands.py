@@ -3,15 +3,24 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
+from app.services.preview import send_post_preview
 from app.settings import get_settings
-from app.storage.posts import list_recent_posts
+from app.storage.posts import (
+    count_posts_by_status,
+    get_post,
+    last_published_at,
+    list_recent_posts,
+    reopen_failed_post,
+)
 from app.storage.rules import add_rule, list_rules
+from app.storage.session import set_active_post
 from app.storage.sources import (
     list_sources,
     set_source_blocked,
     update_source_score,
     upsert_source,
 )
+from app.ui import channel_label, review_keyboard
 
 router = Router()
 
@@ -24,8 +33,7 @@ async def start_command(message: Message) -> None:
     await message.answer(
         "<b>pCurator ativo.</b>\n\n"
         "Envie um link de notícia para iniciar uma curadoria manual.\n"
-        "Use /ph para ver os comandos disponíveis.",
-        parse_mode="HTML",
+        "Use /ph para ver os comandos disponíveis."
     )
 
 
@@ -36,18 +44,26 @@ async def help_command(message: Message) -> None:
 
     await message.answer(
         "<b>Comandos pCurator</b>\n\n"
+        "<b>Fluxo de publicação</b>\n"
+        "1. Envie o link da matéria.\n"
+        "2. Escolha 📘 Canal 1 ou 📰 Canal 2.\n"
+        "3. Revise a prévia: ✅ Publicar, ✏️ Editar texto, 🖼 Trocar imagem ou 🚫 Ignorar.\n"
+        "4. Confirme o envio na prévia final.\n\n"
+        "<b>Comandos gerais</b>\n"
         "/start — estado inicial\n"
         "/ph — ajuda rápida\n"
         "/ps — status técnico\n"
         "/pq — fila editorial\n"
-        "/pf — fontes\n"
+        "/pfr ID — reabrir post 'failed' como rascunho\n\n"
+        "<b>Fontes</b>\n"
+        "/pf — listar fontes\n"
         "/pfa Nome | url | escopo | nota — cadastrar fonte\n"
         "/pfs ID nota — alterar nota da fonte\n"
         "/pfb ID — bloquear fonte\n"
-        "/pfu ID — desbloquear fonte\n"
-        "/pr — regras aprendidas\n"
-        "/pra canal | tipo | regra — cadastrar regra\n",
-        parse_mode="HTML",
+        "/pfu ID — desbloquear fonte\n\n"
+        "<b>Regras</b>\n"
+        "/pr — listar regras aprendidas\n"
+        "/pra canal | tipo | regra — cadastrar regra"
     )
 
 
@@ -57,8 +73,21 @@ async def status_command(message: Message) -> None:
         return
 
     settings = get_settings()
+    counts = await count_posts_by_status(settings.database_path)
+    last_pub = await last_published_at(settings.database_path)
+
     c1 = "configurado" if settings.channel_1_id else "pendente"
     c2 = "configurado" if settings.channel_2_id else "pendente"
+    openai_state = "configurado" if settings.openai_key else "não configurado"
+    mira_state = "configurado" if settings.mira_group_id else "não configurado"
+    linkprev_state = "configurado" if settings.linkpreview_key else "não configurado"
+
+    counts_line = (
+        f"draft: {counts.get('draft', 0)} · "
+        f"publishing: {counts.get('publishing', 0)} · "
+        f"published: {counts.get('published', 0)} · "
+        f"failed: {counts.get('failed', 0)}"
+    )
 
     await message.answer(
         "<b>Status pCurator</b>\n\n"
@@ -66,8 +95,11 @@ async def status_command(message: Message) -> None:
         f"Banco: <code>{settings.database_path}</code>\n"
         f"Canal 1: {c1}\n"
         f"Canal 2: {c2}\n"
-        "Modo atual: manual assistido\n",
-        parse_mode="HTML",
+        f"OpenAI: {openai_state}\n"
+        f"Mira: {mira_state}\n"
+        f"LinkPreview: {linkprev_state}\n\n"
+        f"<b>Posts</b>\n{counts_line}\n"
+        f"Última publicação: {last_pub or '—'}"
     )
 
 
@@ -77,20 +109,86 @@ async def queue_command(message: Message) -> None:
         return
 
     settings = get_settings()
-    posts = await list_recent_posts(settings.database_path, limit=5)
+    posts = await list_recent_posts(settings.database_path, limit=8)
+    counts = await count_posts_by_status(settings.database_path)
 
     if not posts:
         await message.answer("Fila editorial vazia.")
         return
 
-    lines = ["<b>Últimos rascunhos</b>", ""]
+    lines = [
+        "<b>Últimos rascunhos</b>",
+        (
+            f"draft: {counts.get('draft', 0)} · "
+            f"publishing: {counts.get('publishing', 0)} · "
+            f"published: {counts.get('published', 0)} · "
+            f"failed: {counts.get('failed', 0)}"
+        ),
+        "",
+    ]
     for post in posts:
         image_status = "com imagem" if post.get("image_url") else "sem imagem"
         lines.append(
             f"#{post['id']} · {post['status']} · {post['channel_slug']} · {image_status}"
         )
+    if counts.get("failed", 0) > 0:
+        lines.append("")
+        lines.append("Use <code>/pfr ID</code> para reabrir um post failed após verificar o canal.")
 
-    await message.answer("\n".join(lines), parse_mode="HTML")
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("pfr"))
+async def reopen_failed_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    parts = (message.text or "").split()
+    if len(parts) < 2:
+        await message.answer("Formato: <code>/pfr ID</code>")
+        return
+
+    try:
+        post_id = int(parts[1])
+    except ValueError:
+        await message.answer("ID precisa ser número.")
+        return
+
+    settings = get_settings()
+    post = await get_post(settings.database_path, post_id)
+    if not post:
+        await message.answer(f"Post #{post_id} não encontrado.")
+        return
+
+    if post.get("status") != "failed":
+        await message.answer(
+            f"Post #{post_id} está com status '{post.get('status')}', não 'failed'. Nada a fazer."
+        )
+        return
+
+    ok = await reopen_failed_post(settings.database_path, post_id)
+    if not ok:
+        await message.answer(f"Não foi possível reabrir o post #{post_id}.")
+        return
+
+    channel_slug = post.get("channel_slug")
+    await set_active_post(
+        settings.database_path,
+        user_id=message.from_user.id,
+        post_id=post_id,
+        mode="review",
+        channel_slug=channel_slug,
+    )
+
+    label = channel_label(channel_slug)
+    await message.answer(
+        f"♻️ Post #{post_id} reaberto como rascunho para {label}.\n"
+        "Confirme se a publicação anterior **não** saiu antes de tentar de novo."
+    )
+    refreshed = await get_post(settings.database_path, post_id)
+    if refreshed:
+        await send_post_preview(message.bot, message.chat.id, refreshed)
+    await message.answer("Revise o rascunho:", reply_markup=review_keyboard())
 
 
 @router.message(Command("pf"))
@@ -112,7 +210,7 @@ async def sources_command(message: Message) -> None:
             f"#{source['id']} · {source['name']} · {source['scope']} · {source['quality_score']} · {state}"
         )
 
-    await message.answer("\n".join(lines), parse_mode="HTML")
+    await message.answer("\n".join(lines))
 
 
 @router.message(Command("pfa"))
@@ -127,8 +225,7 @@ async def add_source_command(message: Message) -> None:
     if len(parts) < 1 or not parts[0]:
         await message.answer(
             "Formato: <code>/pfa Nome | url | escopo | nota</code>\n"
-            "Exemplo: <code>/pfa G1 | https://g1.globo.com | global | 80</code>",
-            parse_mode="HTML",
+            "Exemplo: <code>/pfa G1 | https://g1.globo.com | global | 80</code>"
         )
         return
 
@@ -152,7 +249,9 @@ async def add_source_command(message: Message) -> None:
     )
 
     await message.answer(
-        f"Fonte cadastrada: #{source_id} · {name} · {scope} · {quality_score}"
+        f"✅ Fonte salva: #{source_id}\n"
+        f"Nome: {name}\nEscopo: {scope}\nNota: {quality_score}\n"
+        f"URL: {url or '—'}"
     )
 
 
@@ -163,7 +262,7 @@ async def source_score_command(message: Message) -> None:
 
     parts = (message.text or "").split()
     if len(parts) < 3:
-        await message.answer("Formato: <code>/pfs ID nota</code>", parse_mode="HTML")
+        await message.answer("Formato: <code>/pfs ID nota</code>")
         return
 
     try:
@@ -174,8 +273,17 @@ async def source_score_command(message: Message) -> None:
         return
 
     settings = get_settings()
+    sources = await list_sources(settings.database_path, limit=1000)
+    current = next((s for s in sources if s["id"] == source_id), None)
+    if not current:
+        await message.answer(f"Fonte #{source_id} não encontrada.")
+        return
+
+    old_score = current["quality_score"]
     await update_source_score(settings.database_path, source_id, quality_score)
-    await message.answer(f"Fonte #{source_id} atualizada para nota {quality_score}.")
+    await message.answer(
+        f"✅ Fonte #{source_id} ({current['name']}): nota {old_score} → {quality_score}."
+    )
 
 
 @router.message(Command("pfb"))
@@ -185,7 +293,7 @@ async def source_block_command(message: Message) -> None:
 
     parts = (message.text or "").split()
     if len(parts) < 2:
-        await message.answer("Formato: <code>/pfb ID</code>", parse_mode="HTML")
+        await message.answer("Formato: <code>/pfb ID</code>")
         return
 
     try:
@@ -195,8 +303,14 @@ async def source_block_command(message: Message) -> None:
         return
 
     settings = get_settings()
+    sources = await list_sources(settings.database_path, limit=1000)
+    current = next((s for s in sources if s["id"] == source_id), None)
+    if not current:
+        await message.answer(f"Fonte #{source_id} não encontrada.")
+        return
+
     await set_source_blocked(settings.database_path, source_id, True)
-    await message.answer(f"Fonte #{source_id} bloqueada.")
+    await message.answer(f"🚫 Fonte #{source_id} ({current['name']}) bloqueada.")
 
 
 @router.message(Command("pfu"))
@@ -206,7 +320,7 @@ async def source_unblock_command(message: Message) -> None:
 
     parts = (message.text or "").split()
     if len(parts) < 2:
-        await message.answer("Formato: <code>/pfu ID</code>", parse_mode="HTML")
+        await message.answer("Formato: <code>/pfu ID</code>")
         return
 
     try:
@@ -216,8 +330,14 @@ async def source_unblock_command(message: Message) -> None:
         return
 
     settings = get_settings()
+    sources = await list_sources(settings.database_path, limit=1000)
+    current = next((s for s in sources if s["id"] == source_id), None)
+    if not current:
+        await message.answer(f"Fonte #{source_id} não encontrada.")
+        return
+
     await set_source_blocked(settings.database_path, source_id, False)
-    await message.answer(f"Fonte #{source_id} desbloqueada.")
+    await message.answer(f"✅ Fonte #{source_id} ({current['name']}) desbloqueada.")
 
 
 @router.message(Command("pr"))
@@ -240,7 +360,7 @@ async def rules_command(message: Message) -> None:
             f"#{rule['id']} · {channel} · {rule['rule_type']} · peso {rule['weight']} · {state}\n{rule['rule_text']}"
         )
 
-    await message.answer("\n\n".join(lines), parse_mode="HTML")
+    await message.answer("\n\n".join(lines))
 
 
 @router.message(Command("pra"))
@@ -255,8 +375,7 @@ async def add_rule_command(message: Message) -> None:
     if len(parts) < 3:
         await message.answer(
             "Formato: <code>/pra canal | tipo | regra</code>\n"
-            "Exemplo: <code>/pra c1 | tom | evitar assunto pesado no canal leve</code>",
-            parse_mode="HTML",
+            "Exemplo: <code>/pra c1 | tom | evitar assunto pesado no canal leve</code>"
         )
         return
 
@@ -272,4 +391,6 @@ async def add_rule_command(message: Message) -> None:
         rule_text=rule_text,
     )
 
-    await message.answer(f"Regra cadastrada: #{rule_id}")
+    await message.answer(
+        f"✅ Regra #{rule_id} cadastrada para canal '{channel_slug or 'global'}', tipo '{rule_type}'."
+    )

@@ -72,6 +72,34 @@ async def get_post(database_path: str, post_id: int) -> dict | None:
         return dict(row) if row else None
 
 
+async def count_posts_by_status(database_path: str) -> dict[str, int]:
+    async with aiosqlite.connect(database_path) as db:
+        cursor = await db.execute(
+            "SELECT status, COUNT(*) FROM posts GROUP BY status"
+        )
+        rows = await cursor.fetchall()
+        return {row[0]: int(row[1]) for row in rows}
+
+
+async def reopen_failed_post(database_path: str, post_id: int) -> bool:
+    async with aiosqlite.connect(database_path) as db:
+        cursor = await db.execute(
+            "UPDATE posts SET status = 'draft' WHERE id = ? AND status = 'failed'",
+            (post_id,),
+        )
+        await db.commit()
+        return cursor.rowcount == 1
+
+
+async def last_published_at(database_path: str) -> str | None:
+    async with aiosqlite.connect(database_path) as db:
+        cursor = await db.execute(
+            "SELECT created_at FROM posts WHERE status = 'published' ORDER BY id DESC LIMIT 1"
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else None
+
+
 async def list_recent_posts(database_path: str, limit: int = 5) -> list[dict]:
     async with aiosqlite.connect(database_path) as db:
         db.row_factory = aiosqlite.Row

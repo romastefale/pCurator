@@ -12,7 +12,7 @@ from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
 from app.storage.items import find_duplicate_item, save_item
 from app.storage.posts import save_post
-from app.storage.session import set_active_post
+from app.storage.session import get_active_post, set_active_post
 from app.types import ArticleIntake
 from app.ui import channel_keyboard, duplicate_keyboard
 
@@ -31,9 +31,15 @@ async def handle_possible_link(message: Message) -> None:
     if await reject_message_if_not_owner(message):
         return
 
+    settings = get_settings()
+    _, mode = await get_active_post(settings.database_path, message.from_user.id)
+    if mode in ("edit_text", "edit_image", "confirm"):
+        # Em modos de edição/confirmação o link não inicia novo rascunho;
+        # deixa o handler específico tratar (ou simplesmente ignora).
+        return
+
     raw_url = match.group(0).strip()
     canonical_url = clean_url(raw_url)
-    settings = get_settings()
 
     await message.answer("🔎 Link recebido. Extraindo matéria...")
 
@@ -60,7 +66,6 @@ async def handle_possible_link(message: Message) -> None:
         await message.answer(
             "<b>Extração falhou.</b>\n\n"
             "Não consegui obter título ou texto suficiente para criar rascunho.",
-            parse_mode="HTML",
         )
         return
 
@@ -126,6 +131,5 @@ async def handle_possible_link(message: Message) -> None:
         f"Imagem: {image_status}\n"
         f"Risco editorial: {risk['score']}\n\n"
         "Escolha o canal para gerar a legenda editorial final.",
-        parse_mode="HTML",
         reply_markup=channel_keyboard(),
     )

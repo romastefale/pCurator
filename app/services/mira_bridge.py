@@ -5,6 +5,7 @@ import re
 import uuid
 
 from aiogram import Bot
+from aiogram.types import LinkPreviewOptions
 
 from app.settings import get_settings
 from app.types import ArticleIntake, PublicPost
@@ -69,11 +70,17 @@ def _post_from_dict(data: dict, article: ArticleIntake) -> PublicPost:
 
 async def request_mira_public_post(bot: Bot, article: ArticleIntake, channel_slug: str, risk_score: int = 100) -> PublicPost:
     settings = get_settings()
+    if settings.mira_group_id is None:
+        raise RuntimeError("mira_group_id_not_configured")
     request_id, prompt = build_mira_prompt(article, channel_slug, risk_score)
     future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
     _PENDING[request_id] = future
     try:
-        sent = await bot.send_message(settings.mira_group_id, prompt, disable_web_page_preview=True)
+        sent = await bot.send_message(
+            settings.mira_group_id,
+            prompt,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
+        )
         logger.info("mira_request_sent request_id=%s message_id=%s", request_id, sent.message_id)
         response_text = await asyncio.wait_for(future, timeout=settings.mira_timeout_seconds)
         data = _extract_json(response_text)
