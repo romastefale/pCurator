@@ -4,7 +4,6 @@ import logging
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import LinkPreviewOptions
 
 from app.app_factory import create_dispatcher
 from app.settings import get_settings
@@ -21,7 +20,7 @@ async def run_polling() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(
             parse_mode=ParseMode.HTML,
-            link_preview_options=LinkPreviewOptions(is_disabled=True),
+            link_preview_is_disabled=True,
         ),
     )
     dispatcher = create_dispatcher()

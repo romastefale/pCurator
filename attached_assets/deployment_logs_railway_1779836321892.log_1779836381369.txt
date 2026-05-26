@@ -1,0 +1,868 @@
+2026-05-26T22:55:31.285119493Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:55:31.285128762Z [error]     return future.result()
+2026-05-26T22:55:31.285134373Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:55:31.285139379Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:55:31.285144028Z [error]     default=DefaultBotProperties(
+2026-05-26T22:55:31.285336669Z [error] Traceback (most recent call last):
+2026-05-26T22:55:31.285340603Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:55:31.285344672Z [error]     main()
+2026-05-26T22:55:31.285347763Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:55:31.285350934Z [error]     asyncio.run(run_polling())
+2026-05-26T22:55:31.285353873Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:55:31.285357000Z [error]     return runner.run(main)
+2026-05-26T22:55:31.285360573Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:55:31.285364348Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:55:31.285367661Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:55:31.285371104Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:31.285726153Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:31.285731145Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:55:31.888654065Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:55:32.906480266Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:55:32.906845083Z [info] Starting Container
+2026-05-26T22:55:34.657524290Z [error]     default=DefaultBotProperties(
+2026-05-26T22:55:34.657529059Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:34.657532827Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:55:34.657539979Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:55:34.657549003Z [error] Traceback (most recent call last):
+2026-05-26T22:55:34.657549130Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:34.657554058Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:55:34.657560095Z [error]     return future.result()
+2026-05-26T22:55:34.657560203Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:55:34.657565120Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:55:34.657569587Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:55:34.657576107Z [error]     main()
+2026-05-26T22:55:34.657582737Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:55:34.657586460Z [error]     asyncio.run(run_polling())
+2026-05-26T22:55:34.657590117Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:55:34.657593561Z [error]     return runner.run(main)
+2026-05-26T22:55:34.657598993Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:55:34.657602890Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:55:35.885450698Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:55:38.637462533Z [error]     default=DefaultBotProperties(
+2026-05-26T22:55:38.637501780Z [error] Traceback (most recent call last):
+2026-05-26T22:55:38.637505831Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:55:38.637511539Z [error]     main()
+2026-05-26T22:55:38.637515439Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:55:38.637519299Z [error]     asyncio.run(run_polling())
+2026-05-26T22:55:38.637523022Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:55:38.637526450Z [error]     return runner.run(main)
+2026-05-26T22:55:38.637531665Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:55:38.637535057Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:55:38.637538171Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:55:38.637541743Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:38.637545108Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:55:38.637548300Z [error]     return future.result()
+2026-05-26T22:55:38.637551517Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:55:38.637554837Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:55:38.638560891Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:38.638563741Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:55:40.001931557Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:55:42.408817718Z [error] Traceback (most recent call last):
+2026-05-26T22:55:42.408821681Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:55:42.408825030Z [error]     main()
+2026-05-26T22:55:42.408829459Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:55:42.408832978Z [error]     asyncio.run(run_polling())
+2026-05-26T22:55:42.408836718Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:55:42.408840043Z [error]     return runner.run(main)
+2026-05-26T22:55:42.408843311Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:55:42.408847512Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:55:42.408851034Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:55:42.408857527Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:42.408862002Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:55:42.408865353Z [error]     return future.result()
+2026-05-26T22:55:42.408868796Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:55:42.408871724Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:55:42.408875518Z [error]     default=DefaultBotProperties(
+2026-05-26T22:55:42.409538358Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:42.409542775Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:55:46.402864117Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:55:46.438784187Z [error] Traceback (most recent call last):
+2026-05-26T22:55:46.438788794Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:55:46.438793148Z [error]     main()
+2026-05-26T22:55:46.438798365Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:55:46.438806679Z [error]     asyncio.run(run_polling())
+2026-05-26T22:55:46.438810800Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:55:46.438814583Z [error]     return runner.run(main)
+2026-05-26T22:55:46.438820266Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:55:46.438826695Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:55:46.438830475Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:55:46.438834964Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:46.438840480Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:55:46.438846777Z [error]     return future.result()
+2026-05-26T22:55:46.438852138Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:55:46.438858420Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:55:46.438861876Z [error]     default=DefaultBotProperties(
+2026-05-26T22:55:46.439907270Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:46.439913794Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:55:47.786866736Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:55:50.438048826Z [error]     default=DefaultBotProperties(
+2026-05-26T22:55:50.438055118Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:50.438064442Z [error]     return runner.run(main)
+2026-05-26T22:55:50.438068210Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:55:50.438072621Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:55:50.438080116Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:55:50.438082932Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:55:50.438085099Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:50.438090270Z [error] Traceback (most recent call last):
+2026-05-26T22:55:50.438093137Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:55:50.438095981Z [error]     return future.result()
+2026-05-26T22:55:50.438108649Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:55:50.438108829Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:55:50.438111584Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:55:50.438116251Z [error]     asyncio.run(run_polling())
+2026-05-26T22:55:50.438116669Z [error]     main()
+2026-05-26T22:55:50.438118861Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:55:50.438535244Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:55:51.551983360Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:55:54.456484073Z [error] Traceback (most recent call last):
+2026-05-26T22:55:54.456486860Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:54.456492650Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:55:54.456494953Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:55:54.456495776Z [error]     default=DefaultBotProperties(
+2026-05-26T22:55:54.456500783Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:55:54.456507015Z [error]     return future.result()
+2026-05-26T22:55:54.456510917Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:55:54.456515102Z [error]     main()
+2026-05-26T22:55:54.456520295Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:55:54.456525679Z [error]     asyncio.run(run_polling())
+2026-05-26T22:55:54.456525685Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:55:54.456532479Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:55:54.456537463Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:55:54.456544797Z [error]     return runner.run(main)
+2026-05-26T22:55:54.456548514Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:55:54.457483130Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:54.457487004Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:55:55.539467605Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:55:58.532242996Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:58.532244665Z [error]     default=DefaultBotProperties(
+2026-05-26T22:55:58.532249793Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:55:58.532252843Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:55:58.532263860Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:55:58.532264379Z [error]     return future.result()
+2026-05-26T22:55:58.532270840Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:55:58.532273890Z [error]     asyncio.run(run_polling())
+2026-05-26T22:55:58.532276064Z [error]     main()
+2026-05-26T22:55:58.532276803Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:55:58.532279145Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:55:58.532286061Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:55:58.532287654Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:55:58.532294074Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:55:58.532296574Z [error]     return runner.run(main)
+2026-05-26T22:55:58.532296657Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:55:58.532297594Z [error] Traceback (most recent call last):
+2026-05-26T22:55:58.533148511Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:01.884310811Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:02.531463593Z [error] Traceback (most recent call last):
+2026-05-26T22:56:02.531465438Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:02.531466826Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:02.531472478Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:02.531472506Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:02.531478956Z [error]     main()
+2026-05-26T22:56:02.531479016Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:02.531491375Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:02.531497276Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:02.531501382Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:02.531503467Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:02.531503899Z [error]     return future.result()
+2026-05-26T22:56:02.531510358Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:02.531510456Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:02.531513613Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:02.531520169Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:02.531521236Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:02.531524210Z [error]     return runner.run(main)
+2026-05-26T22:56:03.642758230Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:06.508621466Z [error] Traceback (most recent call last):
+2026-05-26T22:56:06.508626266Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:06.508630902Z [error]     main()
+2026-05-26T22:56:06.508635454Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:06.508640608Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:06.508644807Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:06.508648720Z [error]     return runner.run(main)
+2026-05-26T22:56:06.508653407Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:06.508657901Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:06.508662399Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:06.508666393Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:06.508670588Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:06.508674884Z [error]     return future.result()
+2026-05-26T22:56:06.508678963Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:06.508683082Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:06.508687700Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:06.509606572Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:06.509609799Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:07.756404877Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:10.537182217Z [error]     return future.result()
+2026-05-26T22:56:10.537201489Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:10.537206699Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:10.537212618Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:10.537214630Z [error]     main()
+2026-05-26T22:56:10.537220384Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:10.537220580Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:10.537223054Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:10.537229181Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:10.537229381Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:10.537236276Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:10.537236536Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:10.537241732Z [error]     return runner.run(main)
+2026-05-26T22:56:10.537241975Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:10.537246281Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:10.537275305Z [error] Traceback (most recent call last):
+2026-05-26T22:56:10.538330471Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:10.538333480Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:11.656331843Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:14.185370268Z [error]     return runner.run(main)
+2026-05-26T22:56:14.185376183Z [error] Traceback (most recent call last):
+2026-05-26T22:56:14.185378702Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:14.185384234Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:14.185385977Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:14.185391006Z [error]     main()
+2026-05-26T22:56:14.185393630Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:14.185396034Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:14.185401086Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:14.185402498Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:14.185406075Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:14.185408440Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:14.187337293Z [error]     return future.result()
+2026-05-26T22:56:14.187342396Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:14.187345379Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:14.187348069Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:14.187350885Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:14.187353800Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:15.845049776Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:18.208483228Z [error] Traceback (most recent call last):
+2026-05-26T22:56:18.208489284Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:18.208493851Z [error]     main()
+2026-05-26T22:56:18.208498452Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:18.208502522Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:18.208506562Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:18.208509726Z [error]     return runner.run(main)
+2026-05-26T22:56:18.208513686Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:18.208517078Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:18.208520287Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:18.208523561Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:18.208526861Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:18.208530388Z [error]     return future.result()
+2026-05-26T22:56:18.208534753Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:18.208538830Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:18.208542402Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:18.209900806Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:18.209907012Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:19.970292516Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:22.179448406Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:22.179453648Z [error] Traceback (most recent call last):
+2026-05-26T22:56:22.179453686Z [error]     return runner.run(main)
+2026-05-26T22:56:22.179464698Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:22.179464953Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:22.179465105Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:22.179474706Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:22.179474848Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:22.179475111Z [error]     main()
+2026-05-26T22:56:22.179482745Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:22.179483628Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:22.179483714Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:22.179490289Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:22.179491920Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:22.179499592Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:22.179499768Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:22.179505592Z [error]     return future.result()
+2026-05-26T22:56:22.179510054Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:23.876604896Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:26.147147154Z [error] Traceback (most recent call last):
+2026-05-26T22:56:26.147153033Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:26.147156798Z [error]     main()
+2026-05-26T22:56:26.147159956Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:26.147164110Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:26.147167341Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:26.147170463Z [error]     return runner.run(main)
+2026-05-26T22:56:26.147174002Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:26.147177049Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:26.147180969Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:26.147184332Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:26.147188229Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:26.147191061Z [error]     return future.result()
+2026-05-26T22:56:26.147194140Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:26.147197040Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:26.147199923Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:26.147973041Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:26.147978433Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:27.923877171Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:30.030895481Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:30.030896464Z [error]     return future.result()
+2026-05-26T22:56:30.030901816Z [error]     main()
+2026-05-26T22:56:30.030904332Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:30.030906958Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:30.030910064Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:30.030912801Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:30.030915550Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:30.030920560Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:30.030921250Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:30.030925647Z [error]     return runner.run(main)
+2026-05-26T22:56:30.030930304Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:30.030933016Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:30.030941867Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:30.030947039Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:30.030952207Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:30.030978465Z [error] Traceback (most recent call last):
+2026-05-26T22:56:30.031891369Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:32.072471078Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:33.872591528Z [error] Traceback (most recent call last):
+2026-05-26T22:56:33.872597066Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:33.872601037Z [error]     main()
+2026-05-26T22:56:33.872604122Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:33.872607046Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:33.872610452Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:33.872613864Z [error]     return runner.run(main)
+2026-05-26T22:56:33.872618215Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:33.872621330Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:33.872624249Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:33.872627602Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:33.872631281Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:33.872634847Z [error]     return future.result()
+2026-05-26T22:56:33.872637994Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:33.872641552Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:33.872645176Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:33.873809772Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:33.873815517Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:35.200251519Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:37.720289697Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:37.720290901Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:37.720295259Z [error]     main()
+2026-05-26T22:56:37.720299608Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:37.720301108Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:37.720305957Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:37.720310407Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:37.720311203Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:37.720314232Z [error]     return runner.run(main)
+2026-05-26T22:56:37.720318331Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:37.720320293Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:37.720323726Z [error]     return future.result()
+2026-05-26T22:56:37.720329272Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:37.720334323Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:37.720339938Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:37.720344107Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:37.720347988Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:37.720396768Z [error] Traceback (most recent call last):
+2026-05-26T22:56:39.110475634Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:41.737859142Z [error] Traceback (most recent call last):
+2026-05-26T22:56:41.737863268Z [error]     return future.result()
+2026-05-26T22:56:41.737866106Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:41.737870082Z [error]     main()
+2026-05-26T22:56:41.737875992Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:41.737876101Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:41.737880632Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:41.737884952Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:41.737885646Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:41.737892670Z [error]     return runner.run(main)
+2026-05-26T22:56:41.737894998Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:41.737897600Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:41.737902172Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:41.737903447Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:41.737906936Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:41.737912762Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:41.737912839Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:41.737916540Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:45.755148205Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:45.755152200Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:45.755154474Z [error]     main()
+2026-05-26T22:56:45.755158757Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:45.755161403Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:45.755163860Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:45.755167083Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:45.755171208Z [error]     return runner.run(main)
+2026-05-26T22:56:45.755174901Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:45.755178714Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:45.755182450Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:45.755186379Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:45.755189962Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:45.755199394Z [error]     return future.result()
+2026-05-26T22:56:45.755204789Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:45.755209812Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:45.755214834Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:45.755271017Z [error] Traceback (most recent call last):
+2026-05-26T22:56:46.567895198Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:47.478617817Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:49.302119281Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:49.302129915Z [error] Traceback (most recent call last):
+2026-05-26T22:56:49.302130065Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:49.302134527Z [error]     return future.result()
+2026-05-26T22:56:49.302135767Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:49.302136155Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:49.302138858Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:49.302142453Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:49.302146122Z [error]     main()
+2026-05-26T22:56:49.302151320Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:49.302158319Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:49.302158671Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:49.302159858Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:49.302161605Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:49.302166165Z [error]     return runner.run(main)
+2026-05-26T22:56:49.302169413Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:49.302171784Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:49.303445754Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:51.248960218Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:53.146139875Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:53.146147595Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:53.146149265Z [error] Traceback (most recent call last):
+2026-05-26T22:56:53.146154500Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:56:53.146154680Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:53.146159020Z [error]     main()
+2026-05-26T22:56:53.146162034Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:53.146164873Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:53.146168782Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:53.146172482Z [error]     return runner.run(main)
+2026-05-26T22:56:53.146175558Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:53.146178477Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:53.146181662Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:53.146185285Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:53.146188776Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:53.146191822Z [error]     return future.result()
+2026-05-26T22:56:53.146194867Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:53.146198091Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:54.270496828Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:56:56.998067510Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:56:56.998069985Z [error] Traceback (most recent call last):
+2026-05-26T22:56:56.998072467Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:56:56.998076951Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:56:56.998077071Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:56.998082999Z [error]     main()
+2026-05-26T22:56:56.998083355Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:56:56.998088471Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:56:56.998089010Z [error]     return future.result()
+2026-05-26T22:56:56.998094555Z [error]     asyncio.run(run_polling())
+2026-05-26T22:56:56.998095353Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:56:56.998100368Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:56:56.998100740Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:56:56.998106575Z [error]     default=DefaultBotProperties(
+2026-05-26T22:56:56.998106799Z [error]     return runner.run(main)
+2026-05-26T22:56:56.998110285Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:56:56.999536400Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:56:56.999540820Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:00.426174301Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:01.045346880Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:01.045350345Z [error] Traceback (most recent call last):
+2026-05-26T22:57:01.045355489Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:01.045357182Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:01.045360771Z [error]     main()
+2026-05-26T22:57:01.045363696Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:01.045369638Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:01.045372537Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:01.045375427Z [error]     return runner.run(main)
+2026-05-26T22:57:01.045378309Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:01.045381038Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:01.045383865Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:01.045386516Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:01.045389636Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:01.045394585Z [error]     return future.result()
+2026-05-26T22:57:01.045397329Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:01.045400151Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:01.045402858Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:02.563379777Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:04.987211909Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:04.987214393Z [error] Traceback (most recent call last):
+2026-05-26T22:57:04.987220453Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:04.987223709Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:04.987226797Z [error]     main()
+2026-05-26T22:57:04.987232800Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:04.987233336Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:04.987238066Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:04.987241938Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:04.987245926Z [error]     return runner.run(main)
+2026-05-26T22:57:04.987249841Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:04.987254244Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:04.987259449Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:04.987262901Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:04.987266765Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:04.987270516Z [error]     return future.result()
+2026-05-26T22:57:04.987875790Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:04.987880096Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:06.622998958Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:08.986752038Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:08.986788096Z [error] Traceback (most recent call last):
+2026-05-26T22:57:08.986792681Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:08.986797010Z [error]     main()
+2026-05-26T22:57:08.986801781Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:08.986806426Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:08.986831821Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:08.986835384Z [error]     return runner.run(main)
+2026-05-26T22:57:08.986838985Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:08.986842107Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:08.986845226Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:08.986850015Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:08.986854377Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:08.986858190Z [error]     return future.result()
+2026-05-26T22:57:08.986861239Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:08.986864338Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:08.986867476Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:08.986870755Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:11.067582471Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:13.198991310Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:13.199001464Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:13.199004472Z [error] Traceback (most recent call last):
+2026-05-26T22:57:13.199009464Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:13.199011782Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:13.199016666Z [error]     main()
+2026-05-26T22:57:13.199020490Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:13.199024170Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:13.199027943Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:13.199031287Z [error]     return runner.run(main)
+2026-05-26T22:57:13.199034221Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:13.199036919Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:13.200621811Z [error]     return future.result()
+2026-05-26T22:57:13.200626374Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:13.200630011Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:13.200632821Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:13.200635800Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:13.200638662Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:16.298345548Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:17.186376769Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:17.186378176Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:17.186382173Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:17.186389042Z [error]     return future.result()
+2026-05-26T22:57:17.186393443Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:17.186398514Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:17.186398822Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:17.186402329Z [error]     main()
+2026-05-26T22:57:17.186410302Z [error]     return runner.run(main)
+2026-05-26T22:57:17.186410780Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:17.186419441Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:17.186419814Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:17.186426411Z [error] Traceback (most recent call last):
+2026-05-26T22:57:17.186428057Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:17.186433769Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:17.186437191Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:17.186441947Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:17.186445913Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:19.399934669Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:21.039782436Z [error] Traceback (most recent call last):
+2026-05-26T22:57:21.039791028Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:21.039795907Z [error]     main()
+2026-05-26T22:57:21.039800137Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:21.039804503Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:21.039809720Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:21.039814416Z [error]     return runner.run(main)
+2026-05-26T22:57:21.039819440Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:21.039824234Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:21.039830086Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:21.039835471Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:21.039841766Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:21.039847921Z [error]     return future.result()
+2026-05-26T22:57:21.039853150Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:21.039858755Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:21.039863829Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:21.039869612Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:21.040774001Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:22.149468878Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:25.094174006Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:25.094190658Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:25.094195273Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:25.094199513Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:25.094201952Z [error] Traceback (most recent call last):
+2026-05-26T22:57:25.094206318Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:25.094213071Z [error]     main()
+2026-05-26T22:57:25.094213984Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:25.094215059Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:25.094218156Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:25.094218270Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:25.094223180Z [error]     return runner.run(main)
+2026-05-26T22:57:25.094225452Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:25.094227393Z [error]     return future.result()
+2026-05-26T22:57:25.094228074Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:25.094230616Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:25.094233641Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:25.094713918Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:26.295136085Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:29.144859177Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:29.144860380Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:29.144866670Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:29.144869002Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:29.144874828Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:29.144876008Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:29.144879910Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:29.144882906Z [error]     return runner.run(main)
+2026-05-26T22:57:29.144887280Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:29.144891572Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:29.144895448Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:29.144900270Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:29.144904501Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:29.144909341Z [error]     return future.result()
+2026-05-26T22:57:29.145213856Z [error] Traceback (most recent call last):
+2026-05-26T22:57:29.145218052Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:29.145221615Z [error]     main()
+2026-05-26T22:57:29.145629815Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:31.260674900Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:32.521869967Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:32.521876507Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:32.521877598Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:32.521882252Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:32.521885339Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:32.521888700Z [error]     return future.result()
+2026-05-26T22:57:32.521892112Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:32.521896892Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:32.521898441Z [error] Traceback (most recent call last):
+2026-05-26T22:57:32.521905098Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:32.521911154Z [error]     main()
+2026-05-26T22:57:32.521917754Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:32.521926429Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:32.521933234Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:32.521939413Z [error]     return runner.run(main)
+2026-05-26T22:57:32.521945853Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:32.521952450Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:32.521958567Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:34.237342292Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:36.156156452Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:36.156160471Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:36.156164401Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:36.156169476Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:36.156171883Z [error]     main()
+2026-05-26T22:57:36.156175038Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:36.156178806Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:36.156182998Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:36.156187142Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:36.156190252Z [error]     return runner.run(main)
+2026-05-26T22:57:36.156193676Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:36.156196843Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:36.156200177Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:36.156203254Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:36.156207160Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:36.156210373Z [error]     return future.result()
+2026-05-26T22:57:36.156231452Z [error] Traceback (most recent call last):
+2026-05-26T22:57:36.156235479Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:37.235391447Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:40.146882062Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:40.146882666Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:40.146888450Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:40.146890288Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:40.146901372Z [error]     return runner.run(main)
+2026-05-26T22:57:40.146903164Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:40.146906982Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:40.146909697Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:40.146910949Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:40.146914771Z [error]     return future.result()
+2026-05-26T22:57:40.146919988Z [error]     main()
+2026-05-26T22:57:40.146920122Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:40.146924197Z [error] Traceback (most recent call last):
+2026-05-26T22:57:40.146927549Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:40.146935151Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:40.146938531Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:40.148172571Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:40.148177119Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:41.307264173Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:44.180746695Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:44.180756393Z [error]     main()
+2026-05-26T22:57:44.180761305Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:44.180765792Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:44.180769233Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:44.180772820Z [error]     return runner.run(main)
+2026-05-26T22:57:44.180776840Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:44.180778815Z [error] Traceback (most recent call last):
+2026-05-26T22:57:44.180781386Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:44.180784824Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:44.180788352Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:44.180791504Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:44.180795552Z [error]     return future.result()
+2026-05-26T22:57:44.180798553Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:44.180801357Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:44.180804059Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:44.180808129Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:44.182048127Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:45.492177496Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:47.800578154Z [error] Traceback (most recent call last):
+2026-05-26T22:57:47.800582035Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:47.800586054Z [error]     main()
+2026-05-26T22:57:47.800590146Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:47.800594114Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:47.800597669Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:47.800601262Z [error]     return runner.run(main)
+2026-05-26T22:57:47.800605107Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:47.800608924Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:47.800612625Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:47.800760163Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:47.800765573Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:47.800769053Z [error]     return future.result()
+2026-05-26T22:57:47.800772593Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:47.800775741Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:47.800779354Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:47.801898654Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:47.801902805Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:49.747385326Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:52.258879738Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:52.258887595Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:52.258897817Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:52.258905448Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:52.258910436Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:52.258949150Z [error] Traceback (most recent call last):
+2026-05-26T22:57:52.258953399Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:52.258957865Z [error]     main()
+2026-05-26T22:57:52.258964065Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:52.258968660Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:52.258972819Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:52.259748159Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:52.259753476Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:53.770880116Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:57:55.888624112Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:55.888627073Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:55.888629972Z [error]     main()
+2026-05-26T22:57:55.888633246Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:55.888636578Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:55.888639479Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:55.888645461Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:55.888648521Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:55.888651707Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:55.888655341Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:55.888658318Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:55.888664861Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:55.889643574Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:57:59.835034353Z [error] Traceback (most recent call last):
+2026-05-26T22:57:59.835042201Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:57:59.835047113Z [error]     main()
+2026-05-26T22:57:59.835051171Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:57:59.835057567Z [error]     asyncio.run(run_polling())
+2026-05-26T22:57:59.835063091Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:57:59.835067490Z [error]     return runner.run(main)
+2026-05-26T22:57:59.835071659Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:57:59.835077099Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:57:59.835082042Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:57:59.835086999Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:59.835091206Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:57:59.835095377Z [error]     return future.result()
+2026-05-26T22:57:59.835101000Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:57:59.835105231Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:57:59.835109226Z [error]     default=DefaultBotProperties(
+2026-05-26T22:57:59.835113125Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:57:59.836394258Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:00.908680252Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:01.838469427Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:03.765947820Z [error] Traceback (most recent call last):
+2026-05-26T22:58:03.765958086Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:58:03.765966138Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:03.765970513Z [error]     return runner.run(main)
+2026-05-26T22:58:03.765978466Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:58:03.765982373Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:58:03.765986168Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:03.765989880Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:58:03.765993389Z [error]     return future.result()
+2026-05-26T22:58:03.765996973Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:58:03.766003657Z [error]     default=DefaultBotProperties(
+2026-05-26T22:58:03.767526404Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:03.767529360Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:05.445625661Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:07.634981914Z [error] Traceback (most recent call last):
+2026-05-26T22:58:07.634989914Z [error]     main()
+2026-05-26T22:58:07.634994036Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:58:07.634998009Z [error]     asyncio.run(run_polling())
+2026-05-26T22:58:07.635001568Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:07.635005084Z [error]     return runner.run(main)
+2026-05-26T22:58:07.635009197Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:58:07.635012951Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:58:07.635016277Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:58:07.635020046Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:07.635023477Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:58:07.635028843Z [error]     return future.result()
+2026-05-26T22:58:07.635032346Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:58:07.635035645Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:58:07.635039291Z [error]     default=DefaultBotProperties(
+2026-05-26T22:58:07.636371060Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:09.564437440Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:11.526055450Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:58:11.526061915Z [error]     default=DefaultBotProperties(
+2026-05-26T22:58:11.526067021Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:11.526072809Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:11.526075235Z [error] Traceback (most recent call last):
+2026-05-26T22:58:11.526085346Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:58:11.526089752Z [error]     main()
+2026-05-26T22:58:11.526096238Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:58:11.526100433Z [error]     asyncio.run(run_polling())
+2026-05-26T22:58:11.526105395Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:11.526109275Z [error]     return runner.run(main)
+2026-05-26T22:58:11.526116739Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:58:11.526120863Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:58:11.526125076Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:11.526132595Z [error]     return future.result()
+2026-05-26T22:58:11.526135736Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:58:12.510559733Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:15.458769691Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:58:15.458776681Z [error]     default=DefaultBotProperties(
+2026-05-26T22:58:15.458830876Z [error] Traceback (most recent call last):
+2026-05-26T22:58:15.458834072Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:58:15.458844100Z [error]     main()
+2026-05-26T22:58:15.458847815Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:58:15.458851272Z [error]     asyncio.run(run_polling())
+2026-05-26T22:58:15.458854432Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:15.458860695Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:58:15.458863615Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:58:15.458866675Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:58:15.458870634Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:15.458873697Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:58:15.458879433Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:58:15.459758788Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:15.459762135Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:19.540908762Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:58:19.540912506Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:19.540931977Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:58:19.540933580Z [error] Traceback (most recent call last):
+2026-05-26T22:58:19.540940365Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:58:19.540943537Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:19.540947391Z [error]     main()
+2026-05-26T22:58:19.540948558Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:58:19.540952407Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:58:19.540957615Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:19.540958593Z [error]     asyncio.run(run_polling())
+2026-05-26T22:58:19.540961543Z [error]     return future.result()
+2026-05-26T22:58:19.540964481Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:19.540969353Z [error]     return runner.run(main)
+2026-05-26T22:58:19.540973907Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:58:20.932927817Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:23.499655277Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:58:23.499662801Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:23.499672361Z [error]     return future.result()
+2026-05-26T22:58:23.499705605Z [error] Traceback (most recent call last):
+2026-05-26T22:58:23.499708773Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:58:23.499712185Z [error]     main()
+2026-05-26T22:58:23.499716355Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:58:23.499720128Z [error]     asyncio.run(run_polling())
+2026-05-26T22:58:23.499724925Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:23.499728883Z [error]     return runner.run(main)
+2026-05-26T22:58:23.499732087Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:58:23.499736192Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:58:23.500610127Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:58:23.500617694Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:58:23.500627742Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:23.500630930Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:24.951908025Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:27.526315693Z [error]     asyncio.run(run_polling())
+2026-05-26T22:58:27.526319103Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:27.526323596Z [error]     return runner.run(main)
+2026-05-26T22:58:27.526328452Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:58:27.526332292Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:58:27.526335488Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:58:27.526339291Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:27.526346362Z [error]     return future.result()
+2026-05-26T22:58:27.526349576Z [error]            ^^^^^^^^^^^^^^^
+2026-05-26T22:58:27.526359824Z [error]     default=DefaultBotProperties(
+2026-05-26T22:58:27.527552465Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:27.527556260Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:31.537941746Z [error]     return self._loop.run_until_complete(task)
+2026-05-26T22:58:31.537949096Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:31.537956976Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:58:31.537966145Z [error]   File "/app/app/runner.py", line 36, in main
+2026-05-26T22:58:31.537975449Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:31.537982816Z [error]     return runner.run(main)
+2026-05-26T22:58:31.537986530Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:58:31.537990232Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+2026-05-26T22:58:31.538020284Z [error] Traceback (most recent call last):
+2026-05-26T22:58:31.538025948Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:58:31.539083682Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:31.539087468Z [error] TypeError: DefaultBotProperties.__init__() got an unexpected keyword argument 'link_preview_options'
+2026-05-26T22:58:31.844654968Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:33.043075492Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:35.198334944Z [error] Traceback (most recent call last):
+2026-05-26T22:58:35.198341126Z [error]   File "/app/main.py", line 5, in <module>
+2026-05-26T22:58:35.198353047Z [error]     asyncio.run(run_polling())
+2026-05-26T22:58:35.198356766Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:35.198375148Z [error]            ^^^^^^^^^^^^^^^^
+2026-05-26T22:58:35.198391053Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+2026-05-26T22:58:35.198394425Z [error]     return future.result()
+2026-05-26T22:58:35.198401633Z [error]   File "/app/app/runner.py", line 22, in run_polling
+2026-05-26T22:58:35.536059828Z [error]             ^^^^^^^^^^^^^^^^^^^^^
+2026-05-26T22:58:36.174545276Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/91530518-6a36-489d-b60d-7f2e36bb93f8/vol_zqe7oxu0xdthfyjm
+2026-05-26T22:58:39.211450270Z [error]   File "/mise/installs/python/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+2026-05-26T22:58:39.211469713Z [error]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
