@@ -30,7 +30,7 @@ def _format_body_lines(body: str) -> str:
     sentences = [s.strip() for s in sentences if s.strip()]
     if not sentences:
         return html.escape(text)
-    return "\n".join(html.escape(s) for s in sentences)
+    return "\n\n".join(html.escape(s) for s in sentences)
 
 
 def _normalize_post_spacing(value: str) -> str:
