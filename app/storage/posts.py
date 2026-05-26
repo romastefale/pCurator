@@ -23,6 +23,15 @@ async def save_post(
         return int(cursor.lastrowid)
 
 
+async def update_post_channel_slug(database_path: str, post_id: int, channel_slug: str) -> None:
+    async with aiosqlite.connect(database_path) as db:
+        await db.execute(
+            "UPDATE posts SET channel_slug = ? WHERE id = ?",
+            (channel_slug, post_id),
+        )
+        await db.commit()
+
+
 async def update_post_caption(database_path: str, post_id: int, caption_html: str) -> None:
     async with aiosqlite.connect(database_path) as db:
         await db.execute(

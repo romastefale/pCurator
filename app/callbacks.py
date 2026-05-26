@@ -10,9 +10,21 @@ from app.services.regenerator import regenerate_post_for_channel
 from app.settings import get_settings
 from app.storage.articles import get_article
 from app.storage.events import log_event
-from app.storage.posts import get_post, save_post, try_lock_post_for_publish, update_post_status
+from app.storage.posts import (
+    get_post,
+    save_post,
+    try_lock_post_for_publish,
+    update_post_channel_slug,
+    update_post_status,
+)
 from app.storage.session import get_active_context, get_active_post, set_active_post
-from app.ui import channel_keyboard, channel_label, confirm_keyboard, review_keyboard
+from app.ui import (
+    channel_keyboard,
+    channel_label,
+    confirm_keyboard,
+    destination_keyboard,
+    review_keyboard,
+)
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -93,7 +105,11 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
         await callback.message.answer("Nenhum rascunho ativo encontrado.")
         return
 
-    await callback.message.answer(f"{label} selecionado. Gerando prévia editorial...")
+    await callback.message.answer(
+        f"🎨 Gerando prévia com o tom de {label} (a escolha do canal de destino vem depois)..."
+    )
+    # Persiste o tom no próprio post pra /pfr e auditoria reabrirem com o tom original.
+    await update_post_channel_slug(settings.database_path, post_id, channel_slug)
     metadata = await regenerate_post_for_channel(
         settings.database_path,
         post_id=post_id,
@@ -111,10 +127,11 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
 
     can_publish = bool(metadata.get("ok")) and bool(metadata.get("publishable", True))
     instruction = (
-        f"Revise o rascunho para {label} antes de publicar."
+        f"Acima está a prévia exata (tom de {label}).\n"
+        "Você pode editar o texto, trocar a imagem ou avançar para escolher o canal de publicação."
         if can_publish
-        else f"⚠️ Rascunho marcado como não publicável automaticamente para {label}.\n"
-        "Edite o texto ou troque a imagem antes de tentar publicar."
+        else f"⚠️ Rascunho marcado como não publicável automaticamente (tom de {label}).\n"
+        "Edite o texto ou troque a imagem antes de avançar."
     )
     await callback.message.answer(instruction, reply_markup=review_keyboard(can_publish=can_publish))
 
@@ -217,25 +234,21 @@ async def ignore_channel(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "post:publish")
 async def review_publish(callback: CallbackQuery) -> None:
+    """Após revisão, pergunta o canal de DESTINO (pode ser diferente do tom)."""
     _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
     settings = get_settings()
     post_id, channel_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
-    await _log_choice(callback, channel_slug, "publish_requested")
-    await callback.answer("Revise antes de confirmar")
+    await _log_choice(callback, channel_slug, "destination_requested")
+    await callback.answer("Escolha o canal de destino")
 
     if not callback.message:
         return
 
     if post_id is None:
         await callback.message.answer("Nenhum rascunho ativo encontrado.")
-        return
-
-    channel_id = _resolve_channel_id(channel_slug)
-    if channel_id is None:
-        await callback.message.answer("Canal de destino não configurado para este rascunho.")
         return
 
     post = await get_post(settings.database_path, post_id)
@@ -249,42 +262,150 @@ async def review_publish(callback: CallbackQuery) -> None:
         )
         return
 
+    tone_label = channel_label(channel_slug)
+    await callback.message.answer(
+        f"📤 Texto pronto (tom de {tone_label}).\n"
+        "Para qual canal você quer publicar?",
+        reply_markup=destination_keyboard(),
+    )
+
+
+async def _prepare_destination_confirm(callback: CallbackQuery, destination_slug: str) -> None:
+    settings = get_settings()
+    post_id, tone_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
+    await _log_choice(callback, destination_slug, "destination_selected")
+    await callback.answer(f"{channel_label(destination_slug)} selecionado")
+
+    if not callback.message:
+        return
+
+    if post_id is None:
+        await callback.message.answer("Nenhum rascunho ativo encontrado.")
+        return
+
+    destination_id = _resolve_channel_id(destination_slug)
+    if destination_id is None:
+        await callback.message.answer(
+            f"⚠️ {channel_label(destination_slug)} não está configurado nas variáveis de ambiente."
+        )
+        return
+
+    post = await get_post(settings.database_path, post_id)
+    if not post:
+        await callback.message.answer("Post ativo não encontrado no banco.")
+        return
+
+    if post.get("status") in ("published", "publishing", "failed"):
+        await callback.message.answer(
+            f"⚠️ Post #{post_id} está com status '{post.get('status')}'. Envio bloqueado por segurança."
+        )
+        return
+
+    # Sessão passa a guardar o canal de DESTINO (sobrescreve o tom).
     await set_active_post(
         settings.database_path,
         user_id=callback.from_user.id,
         post_id=post_id,
         mode="confirm",
-        channel_slug=channel_slug,
+        channel_slug=destination_slug,
     )
 
-    label = channel_label(channel_slug)
+    dest_label = channel_label(destination_slug)
+    tone_note = ""
+    if tone_slug and tone_slug != destination_slug:
+        tone_note = f" (gerado com tom de {channel_label(tone_slug)})"
+
     await callback.message.answer(
-        f"🔎 Pré-visualização final para {label} (post #{post_id}).\n"
+        f"🔎 Pré-visualização final para {dest_label}{tone_note} — post #{post_id}.\n"
         "Esta é exatamente a forma como será enviada:"
     )
     await send_post_preview(callback.bot, callback.message.chat.id, post)
     await callback.message.answer(
-        f"Confirma o envio para {label}?",
-        reply_markup=confirm_keyboard(),
+        f"Confirma o envio para {dest_label}?",
+        reply_markup=confirm_keyboard(post_id, destination_slug),
     )
 
 
-@router.callback_query(F.data == "post:confirm")
-async def review_confirm(callback: CallbackQuery) -> None:
+@router.callback_query(F.data == "dest:c1")
+async def destination_c1(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+    await _prepare_destination_confirm(callback, "c1")
+
+
+@router.callback_query(F.data == "dest:c2")
+async def destination_c2(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+    await _prepare_destination_confirm(callback, "c2")
+
+
+@router.callback_query(F.data == "dest:back")
+async def destination_back(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
     if await reject_callback_if_not_owner(callback):
         return
 
     settings = get_settings()
-    post_id, channel_slug, mode = await get_active_context(settings.database_path, callback.from_user.id)
+    post_id, channel_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
+    await _log_choice(callback, channel_slug, "destination_back")
+    await callback.answer("Voltando para revisão")
+
+    if post_id is not None:
+        # Restaura sessão para review (tom permanece em channel_slug).
+        post = await get_post(settings.database_path, post_id)
+        tone_slug = (post or {}).get("channel_slug") if post else channel_slug
+        await set_active_post(
+            settings.database_path,
+            user_id=callback.from_user.id,
+            post_id=post_id,
+            mode="review",
+            channel_slug=tone_slug,
+        )
+
+    if callback.message:
+        await callback.message.answer(
+            "↩️ Voltando para revisão. Use os botões abaixo para ajustar ou avançar de novo:",
+            reply_markup=review_keyboard(),
+        )
+
+
+@router.callback_query(F.data.regexp(r"^post:confirm:\d+:(c1|c2)$"))
+async def review_confirm(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+
+    parts = (callback.data or "").split(":")
+    try:
+        button_post_id = int(parts[2])
+        button_destination = parts[3]
+    except (IndexError, ValueError):
+        await callback.answer("Botão inválido", show_alert=True)
+        return
+
+    settings = get_settings()
+    session_post_id, session_channel, mode = await get_active_context(
+        settings.database_path, callback.from_user.id
+    )
     await callback.answer("Enviando...")
 
     if not callback.message:
         return
 
-    if post_id is None or mode != "confirm":
-        await callback.message.answer("Nenhuma confirmação pendente. Reabra o rascunho.")
+    # Valida que o botão clicado bate com o estado atual da sessão. Isso impede
+    # publicar no destino errado se o usuário clicou num botão obsoleto.
+    if session_post_id != button_post_id or session_channel != button_destination or mode != "confirm":
+        await callback.message.answer(
+            "⚠️ Esta confirmação não bate com o rascunho ativo (botão obsoleto).\n"
+            "Reabra o rascunho e escolha o destino de novo."
+        )
         return
+
+    channel_slug = button_destination
+    post_id = button_post_id
 
     channel_id = _resolve_channel_id(channel_slug)
     if channel_id is None:
