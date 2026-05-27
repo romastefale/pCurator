@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS articles (
     extracted_text TEXT,
     text_hash TEXT,
     status TEXT NOT NULL DEFAULT 'new',
+    auto_drafted INTEGER NOT NULL DEFAULT 0,
+    discovered_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

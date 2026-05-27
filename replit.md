@@ -24,4 +24,5 @@ Bot de Telegram para curadoria editorial automatizada (Python 3.12, aiogram).
 - Roda em polling (long-poll), sem webhook.
 - Entrada: `python main.py` → `app.runner.main()`.
 - Variáveis de ambiente (Railway): `BOT_TOKEN`, `OWNER_ID`, `CHANNEL_1_ID`, `CHANNEL_2_ID`, `OPENAI_KEY` (opcional), `LINKPREVIEW_KEY` (opcional), `DATABASE_PATH`, `TIMEZONE`.
+- News discovery (opcional, desligado por padrão): `GNEWS_KEY`, `DISCOVERY_ENABLED=false`, `DISCOVERY_DAILY_CAP=20`, `DISCOVERY_QUIET_START=1`, `DISCOVERY_QUIET_END=5`, `DISCOVERY_TOPICS=` (csv vazio = todas as 7 trilhas: tech,cinema,series,pop,atualidades,ciencia,geek). Loop roda a cada 2h em janela 06h–00h local; trilha padrão é C1 com botão "🎭 Trocar tom" no review.
 - Storage: SQLite em `./data/pcurator.db`.

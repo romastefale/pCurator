@@ -635,6 +635,26 @@ async def review_image(callback: CallbackQuery) -> None:
         await callback.message.answer(f"🖼 Envie a nova imagem para o post #{post_id}.")
 
 
+@router.callback_query(F.data == "post:change_tone")
+async def review_change_tone(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+
+    await _delete_callback_message(callback)
+    if callback.message:
+        await _delete_tracked_previews(
+            callback.bot, callback.message.chat.id, callback.from_user.id
+        )
+    await _log_choice(callback, None, "change_tone_requested")
+    await callback.answer("Escolha o novo tom")
+    if callback.message:
+        await callback.message.answer(
+            "🎭 Escolha o novo tom para regenerar a prévia:",
+            reply_markup=channel_keyboard(),
+        )
+
+
 @router.callback_query(F.data == "post:ignore")
 async def review_ignore(callback: CallbackQuery) -> None:
     _log_callback_received(callback)

@@ -6,6 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from app.app_factory import create_dispatcher
+from app.services.discovery_scheduler import discovery_loop
 from app.settings import get_settings
 from app.storage.database import init_db
 
@@ -24,9 +25,19 @@ async def run_polling() -> None:
         ),
     )
     dispatcher = create_dispatcher()
+
+    discovery_task = asyncio.create_task(
+        discovery_loop(bot, settings), name="discovery_loop"
+    )
+
     try:
         await dispatcher.start_polling(bot)
     finally:
+        discovery_task.cancel()
+        try:
+            await discovery_task
+        except (asyncio.CancelledError, Exception):
+            pass
         await bot.session.close()
 
 

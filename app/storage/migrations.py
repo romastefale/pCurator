@@ -14,6 +14,12 @@ async def apply_migrations(database_path: str) -> None:
             await db.execute("ALTER TABLE articles ADD COLUMN image_url TEXT")
         if "extracted_text" not in article_columns:
             await db.execute("ALTER TABLE articles ADD COLUMN extracted_text TEXT")
+        if "auto_drafted" not in article_columns:
+            await db.execute(
+                "ALTER TABLE articles ADD COLUMN auto_drafted INTEGER NOT NULL DEFAULT 0"
+            )
+        if "discovered_at" not in article_columns:
+            await db.execute("ALTER TABLE articles ADD COLUMN discovered_at TEXT")
 
         session_columns = await _columns(db, "editorial_sessions")
         if "active_channel_slug" not in session_columns:

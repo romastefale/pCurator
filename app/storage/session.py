@@ -44,6 +44,37 @@ async def set_active_post(
         await db.commit()
 
 
+async def try_claim_idle_session(
+    database_path: str,
+    *,
+    user_id: int,
+    post_id: int,
+    mode: str,
+    channel_slug: str | None = None,
+) -> bool:
+    """Reserva atômica: só seta active_post_id se a sessão estiver ociosa
+    (linha inexistente ou active_post_id IS NULL). Devolve True se ganhou
+    a sessão; False se já havia rascunho ativo (auto-discovery deve abortar
+    sem clobberar o trabalho manual em curso)."""
+    async with aiosqlite.connect(database_path) as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO editorial_sessions
+                (user_id, active_post_id, active_channel_slug, mode, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                active_post_id = excluded.active_post_id,
+                active_channel_slug = excluded.active_channel_slug,
+                mode = excluded.mode,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE editorial_sessions.active_post_id IS NULL
+            """,
+            (user_id, post_id, channel_slug, mode),
+        )
+        await db.commit()
+        return cursor.rowcount == 1
+
+
 async def get_active_post(database_path: str, user_id: int) -> tuple[int | None, str | None]:
     async with aiosqlite.connect(database_path) as db:
         cursor = await db.execute(

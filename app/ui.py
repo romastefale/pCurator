@@ -10,7 +10,10 @@ def review_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
                 InlineKeyboardButton(text="🖼 Trocar imagem", callback_data="post:image"),
             ],
-            [InlineKeyboardButton(text="🚫 Ignorar", callback_data="post:ignore")],
+            [
+                InlineKeyboardButton(text="🎭 Trocar tom", callback_data="post:change_tone"),
+                InlineKeyboardButton(text="🚫 Ignorar", callback_data="post:ignore"),
+            ],
         ]
     )
 
