@@ -7,6 +7,7 @@ Bot de Telegram para curadoria editorial automatizada (Python 3.12, aiogram).
 - **Deploy em produção: Railway.** Este bot já roda no Railway — não configurar deployment no Replit nem sugerir publish. O Replit é apenas ambiente de desenvolvimento/edição.
 - Idioma de comunicação: português.
 - **Sempre usar as versões mais recentes** de aiogram e Telegram Bot API ao propor mudanças.
+- **Motor editorial em uso: Mira (mira_bridge).** O `structured_editor` (OpenAI) existe só como fallback de segurança e não é o caminho real em produção. Toda decisão de prompt, limite de caracteres ou regra editorial deve ser pensada e validada primeiro em `app/services/mira_bridge.py`.
 
 ## Versões de referência (última checagem: 26/05/2026)
 
