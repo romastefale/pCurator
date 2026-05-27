@@ -11,7 +11,15 @@ CONVENÇÃO DE TEXTO DE BOTÃO (não regredir):
   - Contexto/ação fica na mensagem acima do teclado; o botão é o objeto.
 """
 
+from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+# CONVENÇÃO SEMÂNTICA DE COR (ButtonStyle, Bot API 9.4+):
+#   - SUCCESS (🟢): raro e sagrado — só "Publicar" e "Confirmar envio".
+#   - DANGER  (🔴): qualquer ação que descarta/cancela/marca como ignored.
+#   - PRIMARY (🔵): seleção entre opções equivalentes (Canal 1/2, trilhas).
+#   - sem style: navegação fraca (Voltar) e ações neutras — deixa a hierarquia
+#     visual respirar (não pintar tudo é tão importante quanto pintar).
 
 
 def review_keyboard(with_next: bool = False) -> InlineKeyboardMarkup:
@@ -20,14 +28,22 @@ def review_keyboard(with_next: bool = False) -> InlineKeyboardMarkup:
     with_next=True acrescenta '⏭ Próxima notícia' (usado no fluxo /buscar
     pra descartar a atual e pedir outra na mesma trilha)."""
     rows = [
-        [InlineKeyboardButton(text="✅ Publicar", callback_data="post:publish")],
+        [InlineKeyboardButton(
+            text="✅ Publicar",
+            callback_data="post:publish",
+            style=ButtonStyle.SUCCESS,
+        )],
         [
             InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
             InlineKeyboardButton(text="🖼 Trocar imagem", callback_data="post:image"),
         ],
         [
             InlineKeyboardButton(text="🎭 Trocar tom", callback_data="post:change_tone"),
-            InlineKeyboardButton(text="🚫 Ignorar", callback_data="post:ignore"),
+            InlineKeyboardButton(
+                text="🚫 Ignorar",
+                callback_data="post:ignore",
+                style=ButtonStyle.DANGER,
+            ),
         ],
     ]
     if with_next:
@@ -35,6 +51,7 @@ def review_keyboard(with_next: bool = False) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text="⏭ Próxima notícia (descartar esta)",
                 callback_data="post:next",
+                style=ButtonStyle.DANGER,
             ),
         ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -45,21 +62,21 @@ def discover_topic_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="💻 Tecnologia", callback_data="discover:tech"),
-                InlineKeyboardButton(text="🎬 Cinema", callback_data="discover:cinema"),
+                InlineKeyboardButton(text="💻 Tecnologia", callback_data="discover:tech", style=ButtonStyle.PRIMARY),
+                InlineKeyboardButton(text="🎬 Cinema", callback_data="discover:cinema", style=ButtonStyle.PRIMARY),
             ],
             [
-                InlineKeyboardButton(text="📺 Séries", callback_data="discover:series"),
-                InlineKeyboardButton(text="🌟 Pop", callback_data="discover:pop"),
+                InlineKeyboardButton(text="📺 Séries", callback_data="discover:series", style=ButtonStyle.PRIMARY),
+                InlineKeyboardButton(text="🌟 Pop", callback_data="discover:pop", style=ButtonStyle.PRIMARY),
             ],
             [
-                InlineKeyboardButton(text="📰 Atualidades", callback_data="discover:atualidades"),
-                InlineKeyboardButton(text="🔬 Ciência", callback_data="discover:ciencia"),
+                InlineKeyboardButton(text="📰 Atualidades", callback_data="discover:atualidades", style=ButtonStyle.PRIMARY),
+                InlineKeyboardButton(text="🔬 Ciência", callback_data="discover:ciencia", style=ButtonStyle.PRIMARY),
             ],
             [
-                InlineKeyboardButton(text="🎮 Geek", callback_data="discover:geek"),
+                InlineKeyboardButton(text="🎮 Geek", callback_data="discover:geek", style=ButtonStyle.PRIMARY),
             ],
-            [InlineKeyboardButton(text="🚫 Cancelar", callback_data="discover:cancel")],
+            [InlineKeyboardButton(text="🚫 Cancelar", callback_data="discover:cancel", style=ButtonStyle.DANGER)],
         ]
     )
 
@@ -73,11 +90,16 @@ def confirm_keyboard(post_id: int, destination_slug: str) -> InlineKeyboardMarku
                 InlineKeyboardButton(
                     text="✅ Confirmar envio",
                     callback_data=f"post:confirm:{post_id}:{destination_slug}",
+                    style=ButtonStyle.SUCCESS,
                 )
             ],
             [
                 InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
-                InlineKeyboardButton(text="🚫 Cancelar", callback_data="post:cancel_confirm"),
+                InlineKeyboardButton(
+                    text="🚫 Cancelar",
+                    callback_data="post:cancel_confirm",
+                    style=ButtonStyle.DANGER,
+                ),
             ],
         ]
     )
@@ -88,10 +110,10 @@ def channel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="🎨 Canal 1", callback_data="channel:c1"),
-                InlineKeyboardButton(text="🎨 Canal 2", callback_data="channel:c2"),
+                InlineKeyboardButton(text="🎨 Canal 1", callback_data="channel:c1", style=ButtonStyle.PRIMARY),
+                InlineKeyboardButton(text="🎨 Canal 2", callback_data="channel:c2", style=ButtonStyle.PRIMARY),
             ],
-            [InlineKeyboardButton(text="🚫 Ignorar", callback_data="channel:ignore")],
+            [InlineKeyboardButton(text="🚫 Ignorar", callback_data="channel:ignore", style=ButtonStyle.DANGER)],
         ]
     )
 
@@ -101,8 +123,8 @@ def destination_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="📘 Canal 1", callback_data="dest:c1"),
-                InlineKeyboardButton(text="📰 Canal 2", callback_data="dest:c2"),
+                InlineKeyboardButton(text="📘 Canal 1", callback_data="dest:c1", style=ButtonStyle.PRIMARY),
+                InlineKeyboardButton(text="📰 Canal 2", callback_data="dest:c2", style=ButtonStyle.PRIMARY),
             ],
             [InlineKeyboardButton(text="↩️ Voltar para revisão", callback_data="dest:back")],
         ]
@@ -113,8 +135,8 @@ def duplicate_keyboard(article_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="🔁 Gerar novamente", callback_data=f"duplicate:regenerate:{article_id}"),
-                InlineKeyboardButton(text="🚫 Ignorar", callback_data="duplicate:ignore"),
+                InlineKeyboardButton(text="🔁 Gerar novamente", callback_data=f"duplicate:regenerate:{article_id}", style=ButtonStyle.PRIMARY),
+                InlineKeyboardButton(text="🚫 Ignorar", callback_data="duplicate:ignore", style=ButtonStyle.DANGER),
             ]
         ]
     )

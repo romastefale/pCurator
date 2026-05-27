@@ -9,6 +9,7 @@ Bot de Telegram para curadoria editorial automatizada (Python 3.12, aiogram).
 - **Sempre usar as versões mais recentes** de aiogram e Telegram Bot API ao propor mudanças.
 - **Motor editorial em uso: Mira (mira_bridge).** O `structured_editor` (OpenAI) existe só como fallback de segurança e não é o caminho real em produção. Toda decisão de prompt, limite de caracteres ou regra editorial deve ser pensada e validada primeiro em `app/services/mira_bridge.py`.
 - **Texto de botão inline curto e incisivo.** Convenção (ver docstring no topo de `app/ui.py`): máx. ~12 chars quando 2 botões dividem a linha; 1 emoji + 1–2 palavras; sem verbo redundante com a mensagem acima ("📘 Canal 1", não "📘 Publicar no Canal 1"); pares paralelos na estrutura. Contexto fica na mensagem; o botão é só o objeto/escolha.
+- **Cor de botão (ButtonStyle, Bot API 9.4+).** Convenção semântica registrada em `app/ui.py`: `SUCCESS` (🟢) só pra Publicar/Confirmar envio (raro e sagrado), `DANGER` (🔴) sempre que a ação descarta/cancela/marca como ignored (inclui "⏭ Próxima notícia"), `PRIMARY` (🔵) pra seleção entre opções equivalentes (canais, trilhas), e **sem style** pra navegação fraca (Voltar) e ações neutras de revisão (Editar/Trocar imagem/Trocar tom) — não pintar tudo é tão importante quanto pintar pra preservar hierarquia.
 
 ## Versões de referência (última checagem: 26/05/2026)
 
