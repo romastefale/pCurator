@@ -1,8 +1,10 @@
 from aiogram import Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import Message
 
 from app.access import reject_message_if_not_owner
+from app.services.manual_discovery import clear_search
 from app.services.preview import send_post_preview
 from app.settings import get_settings
 from app.storage.posts import (
@@ -11,9 +13,14 @@ from app.storage.posts import (
     last_published_at,
     list_recent_posts,
     reopen_failed_post,
+    update_post_status,
 )
 from app.storage.rules import add_rule, list_rules
-from app.storage.session import set_active_post
+from app.storage.session import (
+    get_active_context,
+    pop_last_preview_message_ids,
+    set_active_post,
+)
 from app.storage.sources import (
     list_sources,
     set_source_blocked,
@@ -118,8 +125,41 @@ async def discover_command(message: Message) -> None:
         )
         return
 
+    # Fecha qualquer sessão/rascunho anterior — se o usuário está pedindo
+    # uma nova busca, ele já abandonou o anterior. Rascunho ativo vira
+    # 'ignored' e o estado in-memory da busca anterior é descartado.
+    user_id = message.from_user.id
+    active_id, _, _ = await get_active_context(settings.database_path, user_id)
+    closed_note = ""
+    if active_id:
+        post = await get_post(settings.database_path, active_id)
+        if post and post.get("status") == "draft":
+            await update_post_status(settings.database_path, active_id, "ignored")
+            closed_note = f"\n♻️ Rascunho #{active_id} anterior marcado como ignorado.\n"
+
+        ids = await pop_last_preview_message_ids(settings.database_path, user_id)
+        if ids:
+            try:
+                await message.bot.delete_messages(chat_id=message.chat.id, message_ids=ids)
+            except TelegramBadRequest:
+                for mid in ids:
+                    try:
+                        await message.bot.delete_message(
+                            chat_id=message.chat.id, message_id=mid,
+                        )
+                    except TelegramBadRequest:
+                        pass
+
+        await set_active_post(
+            settings.database_path, user_id=user_id, post_id=None,
+            mode=None, clear_channel=True,
+        )
+
+    clear_search(user_id)
+
     await message.answer(
-        "🔍 <b>Buscar notícia agora</b>\n\n"
+        "🔍 <b>Buscar notícia agora</b>"
+        f"{closed_note}\n"
         "Escolha a trilha:",
         reply_markup=discover_topic_keyboard(),
     )
