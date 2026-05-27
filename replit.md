@@ -12,7 +12,7 @@ Bot de Telegram para curadoria editorial automatizada (Python 3.12, aiogram).
 ## Versões de referência (última checagem: 26/05/2026)
 
 - **aiogram**: `3.28.2` (PyPI, lançada em 10/05/2026). Suporta Python `>=3.10, <3.15`.
-- **Telegram Bot API**: `9.5` (changelog oficial, maio/2026).
+- **Telegram Bot API**: `10.0` (changelog oficial, lançada em 03/04/2026). Features de 10.0 (bot-to-bot, gifts em canais, reactions em service messages, verifyUser/verifyChat) não afetam o fluxo atual do pCurator; aiogram 3.28.2 já cobre.
 - **Python (runtime do projeto)**: 3.12.3 (compatível).
 - Deprecações relevantes vigentes em aiogram 3.7+:
   - `disable_web_page_preview=True` → usar `link_preview_options=LinkPreviewOptions(is_disabled=True)`.

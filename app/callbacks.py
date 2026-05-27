@@ -40,11 +40,35 @@ router = Router()
 async def _delete_tracked_previews(bot: Bot, chat_id: int, user_id: int) -> None:
     settings = get_settings()
     ids = await pop_last_preview_message_ids(settings.database_path, user_id)
-    for message_id in ids:
-        try:
-            await bot.delete_message(chat_id=chat_id, message_id=message_id)
-        except TelegramBadRequest:
-            pass
+    if not ids:
+        return
+    # Bot API 7.0+ permite deletar até 100 mensagens numa única chamada.
+    try:
+        await bot.delete_messages(chat_id=chat_id, message_ids=ids)
+        return
+    except TelegramBadRequest:
+        # Fallback: alguma msg fora da janela de 48h ou já apagada — tenta uma a uma.
+        for message_id in ids:
+            try:
+                await bot.delete_message(chat_id=chat_id, message_id=message_id)
+            except TelegramBadRequest:
+                pass
+
+
+async def _delete_callback_message(callback: CallbackQuery) -> None:
+    """Apaga a mensagem que continha o botão clicado (prompt agora obsoleto).
+
+    Telegram só permite apagar mensagens enviadas pelo próprio bot e há
+    janela de 48h; ignoramos falhas silenciosamente."""
+    if not callback.message:
+        return
+    try:
+        await callback.bot.delete_message(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.message_id,
+        )
+    except TelegramBadRequest:
+        pass
 
 
 def _log_callback_received(callback: CallbackQuery) -> None:
@@ -122,9 +146,13 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
         await callback.message.answer("Nenhum rascunho ativo encontrado.")
         return
 
-    await callback.message.answer(
+    # Apaga o prompt "novo item / escolha o canal" — confirmação obsoleta.
+    await _delete_callback_message(callback)
+
+    status_msg = await callback.message.answer(
         f"🎨 Gerando prévia com o tom de {label} (a escolha do canal de destino vem depois)..."
     )
+    tracked_status_id = status_msg.message_id
     # Persiste o tom no próprio post pra /pfr e auditoria reabrirem com o tom original.
     await update_post_channel_slug(settings.database_path, post_id, channel_slug)
     metadata = await regenerate_post_for_channel(
@@ -135,7 +163,7 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
     )
     post = await get_post(settings.database_path, post_id)
 
-    tracked: list[int] = []
+    tracked: list[int] = [tracked_status_id]
     if metadata.get("ok") and post:
         tracked.extend(await send_post_preview(callback.bot, callback.message.chat.id, post))
 
@@ -167,6 +195,7 @@ async def duplicate_regenerate(callback: CallbackQuery) -> None:
     if await reject_callback_if_not_owner(callback):
         return
 
+    await _delete_callback_message(callback)
     settings = get_settings()
     parts = (callback.data or "").split(":")
 
@@ -217,6 +246,7 @@ async def duplicate_ignore(callback: CallbackQuery) -> None:
     if await reject_callback_if_not_owner(callback):
         return
 
+    await _delete_callback_message(callback)
     await _log_choice(callback, None, "duplicate_ignored")
     await callback.answer("Ignorado")
     if callback.message:
@@ -243,6 +273,7 @@ async def ignore_channel(callback: CallbackQuery) -> None:
     if await reject_callback_if_not_owner(callback):
         return
 
+    await _delete_callback_message(callback)
     await _log_choice(callback, None, "channel_ignored")
     settings = get_settings()
     await set_active_post(
@@ -271,6 +302,9 @@ async def review_publish(callback: CallbackQuery) -> None:
 
     if not callback.message:
         return
+
+    # Apaga toda a fase de revisão (prévia + warning + instrução c/ botão clicado).
+    await _delete_tracked_previews(callback.bot, callback.message.chat.id, callback.from_user.id)
 
     if post_id is None:
         await callback.message.answer("Nenhum rascunho ativo encontrado.")
@@ -303,6 +337,9 @@ async def _prepare_destination_confirm(callback: CallbackQuery, destination_slug
 
     if not callback.message:
         return
+
+    # Apaga o prompt "Para qual canal você quer publicar?" agora obsoleto.
+    await _delete_callback_message(callback)
 
     if post_id is None:
         await callback.message.answer("Nenhum rascunho ativo encontrado.")
@@ -377,6 +414,7 @@ async def destination_back(callback: CallbackQuery) -> None:
     if await reject_callback_if_not_owner(callback):
         return
 
+    await _delete_callback_message(callback)
     settings = get_settings()
     post_id, channel_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
     await _log_choice(callback, channel_slug, "destination_back")
@@ -424,6 +462,10 @@ async def review_confirm(callback: CallbackQuery) -> None:
     if not callback.message:
         return
 
+    # Sempre apaga o prompt clicado (mesmo se obsoleto) — é o comportamento
+    # esperado pelo usuário: clicou no botão, a mensagem some.
+    await _delete_callback_message(callback)
+
     # Valida que o botão clicado bate com o estado atual da sessão. Isso impede
     # publicar no destino errado se o usuário clicou num botão obsoleto.
     if session_post_id != button_post_id or session_channel != button_destination or mode != "confirm":
@@ -432,6 +474,10 @@ async def review_confirm(callback: CallbackQuery) -> None:
             "Reabra o rascunho e escolha o destino de novo."
         )
         return
+
+    # Limpa também a prévia final + header tracked (sessão válida, então tracked
+    # corresponde de fato a este fluxo).
+    await _delete_tracked_previews(callback.bot, callback.message.chat.id, callback.from_user.id)
 
     channel_slug = button_destination
     post_id = button_post_id
@@ -518,8 +564,16 @@ async def review_cancel_confirm(callback: CallbackQuery) -> None:
     if await reject_callback_if_not_owner(callback):
         return
 
+    await _delete_callback_message(callback)
+
     settings = get_settings()
-    post_id, channel_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
+    post_id, channel_slug, mode = await get_active_context(settings.database_path, callback.from_user.id)
+    # Só limpa tracked se a sessão ainda está na fase de confirmação que esse
+    # botão representa — caso contrário pode estar apagando msgs de outro fluxo.
+    if callback.message and mode == "confirm":
+        await _delete_tracked_previews(
+            callback.bot, callback.message.chat.id, callback.from_user.id
+        )
     await _log_choice(callback, channel_slug, "confirm_cancelled")
     await callback.answer("Confirmação cancelada")
 
@@ -587,8 +641,14 @@ async def review_ignore(callback: CallbackQuery) -> None:
     if await reject_callback_if_not_owner(callback):
         return
 
-    await _log_choice(callback, None, "post_ignored")
+    await _delete_callback_message(callback)
     settings = get_settings()
+    _, _, mode = await get_active_context(settings.database_path, callback.from_user.id)
+    if callback.message and mode in ("review", "confirm"):
+        await _delete_tracked_previews(
+            callback.bot, callback.message.chat.id, callback.from_user.id
+        )
+    await _log_choice(callback, None, "post_ignored")
     await set_active_post(
         settings.database_path,
         user_id=callback.from_user.id,
