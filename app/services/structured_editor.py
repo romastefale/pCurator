@@ -66,7 +66,6 @@ def _fallback_public_post(article: ArticleIntake, channel_slug: str, reason: str
         subtitle=_fallback_subtitle(article),
         body=body,
         source_url=article.url,
-        publishable=bool(article.clean_text),
         needs_review=True,
         quality_notes=[reason],
     )
@@ -79,7 +78,6 @@ def _post_from_dict(data: dict, article: ArticleIntake) -> PublicPost:
         subtitle=str(data.get("subtitle") or ""),
         body=str(data.get("body") or ""),
         source_url=str(data.get("source_url") or article.url),
-        publishable=bool(data.get("publishable", True)),
         needs_review=bool(data.get("needs_review", False)),
         quality_notes=list(data.get("quality_notes") or []),
     )
@@ -112,7 +110,7 @@ Regras obrigatórias:
 - O resumo deve terminar em frase completa, sem corte seco no meio da ideia.
 - Estruture o body em 1 a 3 parágrafos curtos separados por duas quebras de linha (\\n\\n). Cada parágrafo agrupa frases que pertencem à mesma ideia; não isole cada frase em parágrafo próprio.
 - Se a confiança for baixa, use linguagem cautelosa.
-- Se o assunto não for adequado ao canal, marque publishable=false e needs_review=true.
+- Se o assunto exigir cautela editorial, marque needs_review=true (a decisão de publicar é sempre humana).
 
 Canal: {channel_slug}
 Critério do canal: {channel_hint}

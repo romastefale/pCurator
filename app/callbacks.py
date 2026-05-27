@@ -144,16 +144,18 @@ async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, la
         warn_msg = await callback.message.answer(warning)
         tracked.append(warn_msg.message_id)
 
-    can_publish = bool(metadata.get("ok")) and bool(metadata.get("publishable", True))
-    instruction = (
-        f"Acima está a prévia exata (tom de {label}).\n"
-        "Você pode editar o texto, trocar a imagem ou avançar para escolher o canal de publicação."
-        if can_publish
-        else f"⚠️ Rascunho marcado como não publicável automaticamente (tom de {label}).\n"
-        "Edite o texto ou troque a imagem antes de avançar."
-    )
+    if metadata.get("ok"):
+        instruction = (
+            f"Acima está a prévia exata (tom de {label}).\n"
+            "Você pode editar o texto, trocar a imagem ou avançar para escolher o canal de publicação."
+        )
+    else:
+        instruction = (
+            f"Não foi possível gerar a prévia automaticamente (tom de {label}).\n"
+            "Você pode editar o texto manualmente, trocar a imagem ou tentar gerar outro tom."
+        )
     instr_msg = await callback.message.answer(
-        instruction, reply_markup=review_keyboard(can_publish=can_publish)
+        instruction, reply_markup=review_keyboard()
     )
     tracked.append(instr_msg.message_id)
     await set_last_preview_message_ids(settings.database_path, callback.from_user.id, tracked)

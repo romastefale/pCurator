@@ -27,7 +27,6 @@ class PublicPost:
     subtitle: str = ""
     body: str = ""
     source_url: str = ""
-    publishable: bool = True
     needs_review: bool = False
     quality_notes: list[str] = field(default_factory=list)
 

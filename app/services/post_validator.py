@@ -64,7 +64,8 @@ def validate_public_post(post: PublicPost, article: ArticleIntake) -> tuple[bool
 
 
 def force_review(post: PublicPost, issues: list[str]) -> PublicPost:
-    post.publishable = False
+    """Sinaliza problemas de validação local como notas — não bloqueia publicação.
+    A decisão final é sempre do curador humano."""
     post.needs_review = True
     post.quality_notes.extend(issues)
     return post

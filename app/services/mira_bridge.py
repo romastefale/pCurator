@@ -21,7 +21,7 @@ def build_mira_prompt(article: ArticleIntake, channel_slug: str, risk_score: int
         prefix
         + "responda em JSON puro, sem markdown e sem explicações.\n\n"
         + f"ID do pedido: {request_id}\n\n"
-        + "Campos obrigatórios: hashtags, title, subtitle, body, source_url, publishable, needs_review, quality_notes.\n\n"
+        + "Campos obrigatórios: hashtags, title, subtitle, body, source_url, needs_review, quality_notes.\n\n"
         + "Regras: reescreva como resumo editorial para Telegram; não copie a raspagem; não use Via, Prévia editorial, Oferecido por, Por Redação ou Atualizado; não coloque fonte no título; termine em frase completa; use 3 ou 4 hashtags. O campo body deve ter 1 a 3 parágrafos curtos separados por duas quebras de linha (\\n\\n); cada parágrafo agrupa frases que pertencem à mesma ideia.\n\n"
         + f"Canal: {channel_slug}\nRisco: {risk_score}\nFonte: {article.source}\nURL: {article.url}\nTítulo: {article.clean_title}\nTexto:\n{article.clean_text[:2600]}"
     )
@@ -62,7 +62,6 @@ def _post_from_dict(data: dict, article: ArticleIntake) -> PublicPost:
         subtitle=str(data.get("subtitle") or ""),
         body=str(data.get("body") or ""),
         source_url=str(data.get("source_url") or article.url),
-        publishable=bool(data.get("publishable", True)),
         needs_review=bool(data.get("needs_review", False)),
         quality_notes=_as_list(data.get("quality_notes")),
     )

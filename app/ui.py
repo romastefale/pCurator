@@ -1,18 +1,18 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def review_keyboard(can_publish: bool = True) -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
-    if can_publish:
-        rows.append([InlineKeyboardButton(text="✅ Publicar", callback_data="post:publish")])
-    rows.append(
-        [
-            InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
-            InlineKeyboardButton(text="🖼 Trocar imagem", callback_data="post:image"),
+def review_keyboard() -> InlineKeyboardMarkup:
+    """Teclado de revisão — sempre permite publicar. O curador humano decide."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Publicar", callback_data="post:publish")],
+            [
+                InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
+                InlineKeyboardButton(text="🖼 Trocar imagem", callback_data="post:image"),
+            ],
+            [InlineKeyboardButton(text="🚫 Ignorar", callback_data="post:ignore")],
         ]
     )
-    rows.append([InlineKeyboardButton(text="🚫 Ignorar", callback_data="post:ignore")])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def confirm_keyboard(post_id: int, destination_slug: str) -> InlineKeyboardMarkup:

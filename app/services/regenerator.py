@@ -80,6 +80,5 @@ async def regenerate_post_for_channel(
         "used_mira": engine == "mira",
         "used_openai": engine == "openai",
         "needs_review": public_post.needs_review,
-        "publishable": public_post.publishable,
         "quality_notes": quality_notes,
     }
