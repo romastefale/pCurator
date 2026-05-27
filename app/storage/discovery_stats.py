@@ -4,15 +4,15 @@ from zoneinfo import ZoneInfo
 import aiosqlite
 
 _KEY_PREFIX = "discovery_count:"
+_CALLS_KEY_PREFIX = "gnews_calls:"
 
 
-def _today_key(timezone: str) -> str:
+def _today_key(timezone: str, prefix: str = _KEY_PREFIX) -> str:
     now = datetime.now(ZoneInfo(timezone))
-    return f"{_KEY_PREFIX}{now.strftime('%Y-%m-%d')}"
+    return f"{prefix}{now.strftime('%Y-%m-%d')}"
 
 
-async def get_today_count(database_path: str, timezone: str) -> int:
-    key = _today_key(timezone)
+async def _get_count(database_path: str, key: str) -> int:
     async with aiosqlite.connect(database_path) as db:
         cursor = await db.execute(
             "SELECT value FROM app_settings WHERE key = ?", (key,)
@@ -21,8 +21,7 @@ async def get_today_count(database_path: str, timezone: str) -> int:
         return int(row[0]) if row else 0
 
 
-async def increment_today_count(database_path: str, timezone: str) -> int:
-    key = _today_key(timezone)
+async def _increment_count(database_path: str, key: str) -> int:
     async with aiosqlite.connect(database_path) as db:
         cursor = await db.execute(
             "SELECT value FROM app_settings WHERE key = ?", (key,)
@@ -39,3 +38,21 @@ async def increment_today_count(database_path: str, timezone: str) -> int:
         )
         await db.commit()
         return new_value
+
+
+async def get_today_count(database_path: str, timezone: str) -> int:
+    """Quantas notícias novas (artigos virando rascunho) já entregues hoje."""
+    return await _get_count(database_path, _today_key(timezone))
+
+
+async def increment_today_count(database_path: str, timezone: str) -> int:
+    return await _increment_count(database_path, _today_key(timezone))
+
+
+async def get_calls_today(database_path: str, timezone: str) -> int:
+    """Quantas chamadas HTTP ao GNews foram feitas hoje (auto + manual)."""
+    return await _get_count(database_path, _today_key(timezone, _CALLS_KEY_PREFIX))
+
+
+async def increment_calls_today(database_path: str, timezone: str) -> int:
+    return await _increment_count(database_path, _today_key(timezone, _CALLS_KEY_PREFIX))

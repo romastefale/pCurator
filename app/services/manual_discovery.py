@@ -40,11 +40,17 @@ def clear_search(user_id: int) -> None:
     _STATE.pop(user_id, None)
 
 
-async def _refill(state: SearchState, gnews_key: str) -> None:
+async def _refill(state: SearchState, settings: Settings) -> None:
     if state.refills >= MAX_REFILLS:
         return
     state.refills += 1
-    articles = await search_gnews_topic(state.topic, gnews_key, max_results=10)
+    articles = await search_gnews_topic(
+        state.topic,
+        settings.gnews_key,
+        max_results=10,
+        database_path=settings.database_path,
+        timezone=settings.timezone,
+    )
     new = [a for a in articles if a.get("url") and a["url"] not in state.seen_urls]
     state.pending.extend(new)
 
@@ -60,7 +66,7 @@ async def fetch_next_for_search(
         return None
 
     if not state.pending:
-        await _refill(state, settings.gnews_key)
+        await _refill(state, settings)
 
     while True:
         while state.pending:
@@ -88,6 +94,6 @@ async def fetch_next_for_search(
         # pending vazio — tenta refilar
         if state.refills >= MAX_REFILLS:
             return None
-        await _refill(state, settings.gnews_key)
+        await _refill(state, settings)
         if not state.pending:
             return None

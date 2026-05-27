@@ -3,10 +3,20 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import Message
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from app.access import reject_message_if_not_owner
+from app.services.discovery_scheduler import (
+    GNEWS_DAILY_BUDGET,
+    auto_cycles_remaining_today,
+    safe_manual_searches,
+)
 from app.services.manual_discovery import clear_search
+from app.services.news_discovery import ROTATION_BY_HOUR
 from app.services.preview import send_post_preview
 from app.settings import get_settings
+from app.storage.discovery_stats import get_calls_today
 from app.storage.posts import (
     count_posts_by_status,
     get_post,
@@ -157,9 +167,27 @@ async def discover_command(message: Message) -> None:
 
     clear_search(user_id)
 
+    # Orçamento de busca manual sem afetar o auto-loop
+    now = datetime.now(ZoneInfo(settings.timezone))
+    calls_used = await get_calls_today(settings.database_path, settings.timezone)
+    cycles_left = auto_cycles_remaining_today(
+        now.hour,
+        set(ROTATION_BY_HOUR.keys()),
+        settings.discovery_quiet_start,
+        settings.discovery_quiet_end,
+    )
+    safe_searches = safe_manual_searches(calls_used, cycles_left)
+    budget_line = (
+        f"\n📊 <b>{safe_searches}</b> busca(s) manual(is) cabem hoje sem "
+        f"afetar o auto-loop.\n"
+        f"<i>(GNews usado hoje: {calls_used}/{GNEWS_DAILY_BUDGET} · "
+        f"reserva auto restante: {cycles_left} ciclos)</i>\n"
+    )
+
     await message.answer(
         "🔍 <b>Buscar notícia agora</b>"
-        f"{closed_note}\n"
+        f"{closed_note}"
+        f"{budget_line}\n"
         "Escolha a trilha:",
         reply_markup=discover_topic_keyboard(),
     )

@@ -65,17 +65,28 @@ TOPIC_LABELS = {
     "geek": "🎮 Geek",
 }
 
-# Hora local BR → trilhas a buscar nesse ciclo (12 ciclos cobrem 06h–00h).
+# Hora local BR → trilhas a buscar nesse ciclo.
+# Cobertura horária (06h–23h + 00h) com ciclos de 1h. Quiet: 01h–05h.
+# Cada trilha aparece 4–5×/dia em combinações variadas.
 ROTATION_BY_HOUR = {
     6: ["tech", "cinema"],
+    7: ["series", "ciencia"],
     8: ["series", "geek"],
+    9: ["pop", "tech"],
     10: ["pop", "atualidades"],
+    11: ["geek", "ciencia"],
     12: ["ciencia", "tech"],
+    13: ["cinema", "atualidades"],
     14: ["atualidades", "pop"],
+    15: ["ciencia", "series"],
     16: ["cinema", "series"],
+    17: ["pop", "tech"],
     18: ["geek", "pop"],
+    19: ["cinema", "tech"],
     20: ["atualidades", "ciencia"],
+    21: ["pop", "series"],
     22: ["tech", "cinema"],
+    23: ["geek", "atualidades"],
     0: ["ciencia", "geek"],
 }
 
@@ -156,6 +167,8 @@ async def search_gnews_topic(
     country: str = "br",
     max_results: int = 5,
     timeout_seconds: int = 10,
+    database_path: str | None = None,
+    timezone: str | None = None,
 ) -> list[dict]:
     """Busca uma trilha combinando 2 fontes do GNews:
       - top-headlines?category=... → manchetes editoriais da categoria (se houver)
@@ -176,6 +189,12 @@ async def search_gnews_topic(
         "max": max_results, "in": "title,description", "apikey": gnews_key,
     }
 
+    # Importação local pra evitar ciclo (discovery_stats só é necessário
+    # quando o caller pediu tracking via database_path + timezone).
+    track_calls = bool(database_path and timezone)
+    if track_calls:
+        from app.storage.discovery_stats import increment_calls_today
+
     # GNews free tier limita a ~1 req/seg — chamadas SERIAIS com pausa curta
     # entre elas. Em paralelo (asyncio.gather) o GNews devolve 429 na segunda.
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -189,12 +208,16 @@ async def search_gnews_topic(
                 session, "top-headlines", headline_params,
                 topic_key=topic_key, source_label="top-headlines",
             )
+            if track_calls:
+                await increment_calls_today(database_path, timezone)
             await asyncio.sleep(1.2)  # respeita rate limit antes da próxima call
 
         search_articles = await _gnews_get(
             session, "search", search_params,
             topic_key=topic_key, source_label="search",
         )
+        if track_calls:
+            await increment_calls_today(database_path, timezone)
 
     # Intercala (editorial primeiro pra dar prioridade ao que está bombando),
     # depois dedupa por URL preservando ordem.

@@ -20,7 +20,52 @@ from app.ui import review_keyboard
 
 logger = logging.getLogger(__name__)
 
-CYCLE_SECONDS = 7200  # 2h
+CYCLE_SECONDS = 3600  # 1h
+
+# Plano free do GNews. Hard-coded porque é externo (não vem do .env).
+GNEWS_DAILY_BUDGET = 100
+
+# Por trilha buscamos 2 endpoints (top-headlines + search) = 2 calls. Por ciclo
+# rodamos 2 trilhas = 4 calls. Trilhas sem categoria editorial (ex.: geek)
+# economizam 1 call — a estimativa abaixo é conservadora (assume sempre 2).
+AUTO_CALLS_PER_CYCLE = 4
+MANUAL_CALLS_PER_SEARCH = 2  # mesmo raciocínio: 1 trilha × 2 endpoints
+
+
+def auto_cycles_remaining_today(
+    now_hour: int,
+    rotation_hours: set[int],
+    quiet_start: int,
+    quiet_end: int,
+) -> int:
+    """Quantos ciclos do auto-loop ainda vão rodar no MESMO dia calendário
+    (alinhado com a chave gnews_calls:YYYY-MM-DD). Considera só horas futuras
+    do dia atual, em rotation_hours e fora do quiet window.
+
+    Edge cases (com quiet=1-5, rotation=6..23+0):
+      - now=23 → 0 (próximo ciclo às 00h já é amanhã)
+      - now=0  → 18 (6..23 ainda neste dia)
+      - now=1 (quiet) → 18
+      - now=5 (quiet) → 18
+      - now=10 → 13 (11..23)
+      - now=22 → 1 (só 23)
+    """
+    return sum(
+        1
+        for h in range(now_hour + 1, 24)
+        if h in rotation_hours and not (quiet_start <= h <= quiet_end)
+    )
+
+
+def safe_manual_searches(
+    calls_used_today: int,
+    cycles_remaining: int,
+) -> int:
+    """Quantas buscas manuais ainda cabem hoje sem furar o orçamento GNews,
+    reservando o que o auto-loop precisa até o fim do dia."""
+    reserved_for_auto = cycles_remaining * AUTO_CALLS_PER_CYCLE
+    spare = GNEWS_DAILY_BUDGET - calls_used_today - reserved_for_auto
+    return max(0, spare // MANUAL_CALLS_PER_SEARCH)
 
 
 def _is_quiet_hour(hour: int, quiet_start: int, quiet_end: int) -> bool:
@@ -120,7 +165,12 @@ async def _run_cycle(bot: Bot, settings: Settings) -> None:
             break
         if not settings.gnews_key:
             return
-        articles = await search_gnews_topic(topic, settings.gnews_key)
+        articles = await search_gnews_topic(
+            topic,
+            settings.gnews_key,
+            database_path=settings.database_path,
+            timezone=settings.timezone,
+        )
         for art in articles:
             if count >= settings.discovery_daily_cap:
                 break
@@ -161,12 +211,13 @@ async def discovery_loop(bot: Bot, settings: Settings) -> None:
         return
 
     logger.info(
-        "discovery_loop_started cap=%d quiet=%d-%d topics=%s cycle_seconds=%d",
+        "discovery_loop_started cap=%d quiet=%d-%d topics=%s cycle_seconds=%d budget=%d",
         settings.discovery_daily_cap,
         settings.discovery_quiet_start,
         settings.discovery_quiet_end,
         settings.discovery_topics or "all",
         CYCLE_SECONDS,
+        GNEWS_DAILY_BUDGET,
     )
 
     while True:
