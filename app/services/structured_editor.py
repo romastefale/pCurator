@@ -34,10 +34,15 @@ def _complete_summary(text: str, max_chars: int = 680) -> str:
         if len(selected) >= 4:
             break
 
-    summary = " ".join(selected).strip()
-    if not summary.endswith((".", "!", "?")):
-        summary += "."
-    return summary
+    if not selected[-1].endswith((".", "!", "?")):
+        selected[-1] = selected[-1] + "."
+
+    # Agrupa de 2 em 2 frases por parágrafo — fallback também respeita o estilo
+    # de "uma ideia por parágrafo" para o renderer não emendar tudo numa linha só.
+    paragraphs: list[str] = []
+    for i in range(0, len(selected), 2):
+        paragraphs.append(" ".join(selected[i : i + 2]))
+    return "\n\n".join(paragraphs)
 
 
 def _fallback_subtitle(article: ArticleIntake) -> str:
@@ -105,6 +110,7 @@ Regras obrigatórias:
 - Gere título reescrito, subtítulo contextual e corpo resumido.
 - O corpo deve ser jornalístico, curto, claro e sem clickbait.
 - O resumo deve terminar em frase completa, sem corte seco no meio da ideia.
+- Estruture o body em 1 a 3 parágrafos curtos separados por duas quebras de linha (\\n\\n). Cada parágrafo agrupa frases que pertencem à mesma ideia; não isole cada frase em parágrafo próprio.
 - Se a confiança for baixa, use linguagem cautelosa.
 - Se o assunto não for adequado ao canal, marque publishable=false e needs_review=true.
 

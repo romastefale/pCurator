@@ -23,14 +23,18 @@ def _compact_inline(value: str) -> str:
 
 
 def _format_body_lines(body: str) -> str:
-    text = _compact_inline(body)
-    if not text:
+    """Respeita os parágrafos entregues pelo modelo (Mira/OpenAI).
+    Divide por linhas em branco (\\n\\n+) e, dentro de cada parágrafo,
+    apenas colapsa whitespace horizontal — frases da mesma ideia ficam juntas,
+    parágrafos diferentes ficam separados por uma linha em branco."""
+    if not body:
         return ""
-    sentences = re.split(r"(?<=[.!?…])\s+", text)
-    sentences = [s.strip() for s in sentences if s.strip()]
-    if not sentences:
-        return html.escape(text)
-    return "\n\n".join(html.escape(s) for s in sentences)
+    raw_paragraphs = re.split(r"\n\s*\n+", body)
+    paragraphs = [_compact_inline(p) for p in raw_paragraphs]
+    paragraphs = [p for p in paragraphs if p]
+    if not paragraphs:
+        return ""
+    return "\n\n".join(html.escape(p) for p in paragraphs)
 
 
 def _normalize_post_spacing(value: str) -> str:
