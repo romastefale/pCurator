@@ -1,19 +1,52 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def review_keyboard() -> InlineKeyboardMarkup:
-    """Teclado de revisão — sempre permite publicar. O curador humano decide."""
+def review_keyboard(with_next: bool = False) -> InlineKeyboardMarkup:
+    """Teclado de revisão — sempre permite publicar. O curador humano decide.
+
+    with_next=True acrescenta '⏭ Próxima notícia' (usado no fluxo /buscar
+    pra descartar a atual e pedir outra na mesma trilha)."""
+    rows = [
+        [InlineKeyboardButton(text="✅ Publicar", callback_data="post:publish")],
+        [
+            InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
+            InlineKeyboardButton(text="🖼 Trocar imagem", callback_data="post:image"),
+        ],
+        [
+            InlineKeyboardButton(text="🎭 Trocar tom", callback_data="post:change_tone"),
+            InlineKeyboardButton(text="🚫 Ignorar", callback_data="post:ignore"),
+        ],
+    ]
+    if with_next:
+        rows.append([
+            InlineKeyboardButton(
+                text="⏭ Próxima notícia (descartar esta)",
+                callback_data="post:next",
+            ),
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def discover_topic_keyboard() -> InlineKeyboardMarkup:
+    """Escolha de trilha pro comando /buscar."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Publicar", callback_data="post:publish")],
             [
-                InlineKeyboardButton(text="✏️ Editar texto", callback_data="post:edit"),
-                InlineKeyboardButton(text="🖼 Trocar imagem", callback_data="post:image"),
+                InlineKeyboardButton(text="💻 Tecnologia", callback_data="discover:tech"),
+                InlineKeyboardButton(text="🎬 Cinema", callback_data="discover:cinema"),
             ],
             [
-                InlineKeyboardButton(text="🎭 Trocar tom", callback_data="post:change_tone"),
-                InlineKeyboardButton(text="🚫 Ignorar", callback_data="post:ignore"),
+                InlineKeyboardButton(text="📺 Séries", callback_data="discover:series"),
+                InlineKeyboardButton(text="🌟 Pop", callback_data="discover:pop"),
             ],
+            [
+                InlineKeyboardButton(text="📰 Atualidades", callback_data="discover:atualidades"),
+                InlineKeyboardButton(text="🔬 Ciência", callback_data="discover:ciencia"),
+            ],
+            [
+                InlineKeyboardButton(text="🎮 Geek", callback_data="discover:geek"),
+            ],
+            [InlineKeyboardButton(text="🚫 Cancelar", callback_data="discover:cancel")],
         ]
     )
 

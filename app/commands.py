@@ -20,7 +20,7 @@ from app.storage.sources import (
     update_source_score,
     upsert_source,
 )
-from app.ui import channel_label, review_keyboard
+from app.ui import channel_label, discover_topic_keyboard, review_keyboard
 
 router = Router()
 
@@ -55,7 +55,8 @@ async def help_command(message: Message) -> None:
         "/ph — ajuda rápida\n"
         "/ps — status técnico\n"
         "/pq — fila editorial\n"
-        "/pfr ID — reabrir post 'failed' como rascunho\n\n"
+        "/pfr ID — reabrir post 'failed' como rascunho\n"
+        "/buscar — pedir uma notícia agora (escolhe a trilha, gera prévia C1, botão ⏭ Próxima para descartar e pedir outra)\n\n"
         "<b>Fontes</b>\n"
         "/pf — listar fontes\n"
         "/pfa Nome | url | escopo | nota — cadastrar fonte\n"
@@ -101,6 +102,26 @@ async def status_command(message: Message) -> None:
         f"LinkPreview: {linkprev_state}\n\n"
         f"<b>Posts</b>\n{counts_line}\n"
         f"Última publicação: {last_pub or '—'}"
+    )
+
+
+@router.message(Command("buscar"))
+async def discover_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    settings = get_settings()
+    if not settings.gnews_key:
+        await message.answer(
+            "❌ <b>GNEWS_KEY</b> não está configurada no Railway.\n"
+            "Sem a chave do GNews não posso buscar notícias automaticamente."
+        )
+        return
+
+    await message.answer(
+        "🔍 <b>Buscar notícia agora</b>\n\n"
+        "Escolha a trilha:",
+        reply_markup=discover_topic_keyboard(),
     )
 
 

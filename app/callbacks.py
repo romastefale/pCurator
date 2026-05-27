@@ -5,11 +5,19 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
 from app.access import reject_callback_if_not_owner
+from app.services.manual_discovery import (
+    clear_search,
+    fetch_next_for_search,
+    get_search,
+    reset_search,
+)
+from app.services.news_discovery import TOPIC_LABELS
 from app.services.preview import send_post_preview
 from app.services.publisher import publish_post
 from app.services.regenerator import regenerate_post_for_channel
-from app.settings import get_settings
+from app.settings import Settings, get_settings
 from app.storage.articles import get_article
+from app.storage.discovery_stats import get_today_count
 from app.storage.events import log_event
 from app.storage.posts import (
     get_post,
@@ -24,6 +32,7 @@ from app.storage.session import (
     pop_last_preview_message_ids,
     set_active_post,
     set_last_preview_message_ids,
+    try_claim_idle_session,
 )
 from app.ui import (
     channel_keyboard,
@@ -653,6 +662,193 @@ async def review_change_tone(callback: CallbackQuery) -> None:
             "🎭 Escolha o novo tom para regenerar a prévia:",
             reply_markup=channel_keyboard(),
         )
+
+
+async def _deliver_next_manual_draft(
+    bot: Bot,
+    settings: Settings,
+    user_id: int,
+    chat_id: int,
+    topic: str,
+) -> bool:
+    """Busca próxima notícia da trilha, cria rascunho C1, reserva sessão e
+    envia prévia com botão ⏭ Próxima. Devolve True se entregou."""
+    result = await fetch_next_for_search(bot, settings, user_id)
+    if not result:
+        return False
+
+    post_id, source_name = result
+
+    claimed = await try_claim_idle_session(
+        settings.database_path,
+        user_id=user_id,
+        post_id=post_id,
+        mode="review",
+        channel_slug="c1",
+    )
+    if not claimed:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "⚠️ Rascunho criado mas você tem outro post ativo.\n"
+                "Finalize o atual e use /buscar novamente."
+            ),
+        )
+        return True
+
+    try:
+        post = await get_post(settings.database_path, post_id)
+        if not post:
+            raise RuntimeError(f"post {post_id} disappeared after claim")
+
+        topic_label = TOPIC_LABELS.get(topic, topic)
+        header = await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                f"🔍 Busca manual — {topic_label}\n"
+                f"Rascunho #{post_id} · {source_name}"
+            ),
+        )
+        tracked: list[int] = [header.message_id]
+        tracked.extend(await send_post_preview(bot, chat_id, post))
+        instr = await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "Acima a prévia (tom C1 padrão).\n"
+                "Publique, troque o tom, edite, ignore ou peça a próxima."
+            ),
+            reply_markup=review_keyboard(with_next=True),
+        )
+        tracked.append(instr.message_id)
+        await set_last_preview_message_ids(settings.database_path, user_id, tracked)
+        return True
+    except Exception as exc:
+        logger.exception(
+            "manual_draft_notify_failed post=%s rolling back: %s",
+            post_id, type(exc).__name__,
+        )
+        try:
+            await set_active_post(
+                settings.database_path, user_id=user_id, post_id=None,
+                mode=None, clear_channel=True,
+            )
+        except Exception:
+            logger.exception("manual_draft_session_rollback_failed post=%s", post_id)
+        return False
+
+
+@router.callback_query(F.data.startswith("discover:"))
+async def discover_topic_picked(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+
+    topic = callback.data.split(":", 1)[1]
+    await _delete_callback_message(callback)
+
+    if topic == "cancel":
+        clear_search(callback.from_user.id)
+        await callback.answer("Cancelado")
+        if callback.message:
+            await callback.message.answer("🚫 Busca cancelada.")
+        return
+
+    if topic not in TOPIC_LABELS:
+        await callback.answer("Trilha inválida", show_alert=True)
+        return
+
+    settings = get_settings()
+    if not settings.gnews_key:
+        await callback.answer("GNEWS_KEY não configurada", show_alert=True)
+        return
+
+    count = await get_today_count(settings.database_path, settings.timezone)
+    if count >= settings.discovery_daily_cap:
+        await callback.answer("Limite diário atingido", show_alert=True)
+        if callback.message:
+            await callback.message.answer(
+                f"⚠️ Limite diário atingido ({count}/{settings.discovery_daily_cap}). "
+                "Reset à meia-noite local."
+            )
+        return
+
+    await callback.answer("Buscando...")
+    reset_search(callback.from_user.id, topic)
+    if callback.message:
+        ok = await _deliver_next_manual_draft(
+            callback.bot, settings, callback.from_user.id,
+            callback.message.chat.id, topic,
+        )
+        if not ok:
+            await callback.message.answer(
+                f"Nenhuma notícia nova em <b>{TOPIC_LABELS[topic]}</b> agora. "
+                "Tente outra trilha com /buscar."
+            )
+
+
+@router.callback_query(F.data == "post:next")
+async def review_next(callback: CallbackQuery) -> None:
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+
+    settings = get_settings()
+    user_id = callback.from_user.id
+
+    # VALIDA pré-condições ANTES de mexer no rascunho atual — se o estado de
+    # busca foi perdido (restart) ou o cap estourou, o rascunho fica intacto
+    # e o owner pode tratá-lo via Publicar/Ignorar/Editar normalmente.
+    state = get_search(user_id)
+    if not state:
+        await callback.answer("Contexto perdido", show_alert=True)
+        if callback.message:
+            await callback.message.answer(
+                "⚠️ Contexto de busca perdido (bot reiniciou?). "
+                "Use /buscar para começar de novo. "
+                "O rascunho atual continua disponível pra publicar ou ignorar."
+            )
+        return
+
+    count = await get_today_count(settings.database_path, settings.timezone)
+    if count >= settings.discovery_daily_cap:
+        await callback.answer("Limite diário atingido", show_alert=True)
+        if callback.message:
+            await callback.message.answer(
+                f"⚠️ Limite diário atingido ({count}/{settings.discovery_daily_cap}). "
+                "O rascunho atual continua disponível pra publicar ou ignorar."
+            )
+        return
+
+    # Pré-condições OK — agora pode descartar o atual e liberar sessão
+    active_id, _, _ = await get_active_context(settings.database_path, user_id)
+    if active_id:
+        post = await get_post(settings.database_path, active_id)
+        if post and post.get("status") == "draft":
+            await update_post_status(settings.database_path, active_id, "ignored")
+
+    await _delete_callback_message(callback)
+    if callback.message:
+        await _delete_tracked_previews(
+            callback.bot, callback.message.chat.id, user_id
+        )
+    await _log_choice(callback, None, "post_next_requested")
+
+    await set_active_post(
+        settings.database_path, user_id=user_id, post_id=None,
+        mode=None, clear_channel=True,
+    )
+
+    await callback.answer("Buscando próxima...")
+    if callback.message:
+        ok = await _deliver_next_manual_draft(
+            callback.bot, settings, user_id,
+            callback.message.chat.id, state.topic,
+        )
+        if not ok:
+            await callback.message.answer(
+                f"Sem mais notícias novas em <b>{TOPIC_LABELS.get(state.topic, state.topic)}</b>. "
+                "Tente outra trilha com /buscar."
+            )
 
 
 @router.callback_query(F.data == "post:ignore")
