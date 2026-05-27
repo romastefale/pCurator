@@ -1,3 +1,16 @@
+"""Teclados inline do bot.
+
+CONVENÇÃO DE TEXTO DE BOTÃO (não regredir):
+  - Máx. ~12 caracteres por botão quando houver 2 botões na mesma linha
+    (telas estreitas truncam ou quebram em 2 linhas, ficando ilegível).
+  - 1 emoji + 1–2 palavras curtas. Sem verbo redundante com a mensagem acima
+    (ex.: se a mensagem diz "Para qual canal publicar?", o botão é só
+    "📘 Canal 1", não "📘 Publicar no Canal 1").
+  - Pares lado-a-lado devem ter estrutura paralela (mesma contagem de
+    palavras, mesmo padrão de emoji).
+  - Contexto/ação fica na mensagem acima do teclado; o botão é o objeto.
+"""
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
@@ -75,8 +88,8 @@ def channel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="🎨 Tom do Canal 1", callback_data="channel:c1"),
-                InlineKeyboardButton(text="🎨 Tom do Canal 2", callback_data="channel:c2"),
+                InlineKeyboardButton(text="🎨 Canal 1", callback_data="channel:c1"),
+                InlineKeyboardButton(text="🎨 Canal 2", callback_data="channel:c2"),
             ],
             [InlineKeyboardButton(text="🚫 Ignorar", callback_data="channel:ignore")],
         ]
@@ -88,8 +101,8 @@ def destination_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="📘 Publicar no Canal 1", callback_data="dest:c1"),
-                InlineKeyboardButton(text="📰 Publicar no Canal 2", callback_data="dest:c2"),
+                InlineKeyboardButton(text="📘 Canal 1", callback_data="dest:c1"),
+                InlineKeyboardButton(text="📰 Canal 2", callback_data="dest:c2"),
             ],
             [InlineKeyboardButton(text="↩️ Voltar para revisão", callback_data="dest:back")],
         ]
