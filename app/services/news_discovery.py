@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from urllib.parse import urlparse
 
@@ -5,14 +6,53 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
+# Queries enriquecidas com entidades/marcas pra ampliar o leque de resultados.
+# Cuidado: GNews aceita ~250 chars na query — manter abaixo disso.
 TOPIC_QUERIES = {
-    "tech": 'tecnologia OR "inteligência artificial" OR gadget',
-    "cinema": "filme OR cinema OR estreia OR trailer",
-    "series": "série OR streaming OR Netflix OR HBO",
-    "pop": '"cultura pop" OR viral OR celebridade',
-    "atualidades": 'Brasil OR trending OR "em alta"',
-    "ciencia": "ciência OR descoberta OR estudo",
-    "geek": "anime OR quadrinhos OR games OR Marvel OR DC",
+    "tech": (
+        'IA OR "inteligência artificial" OR ChatGPT OR OpenAI OR Gemini OR '
+        'Apple OR iPhone OR Google OR Microsoft OR Android OR gadget OR '
+        'startup OR fintech OR criptomoeda OR Tesla OR robô OR chip'
+    ),
+    "cinema": (
+        "filme OR cinema OR estreia OR trailer OR bilheteria OR Hollywood OR "
+        "Oscar OR Marvel OR DC OR Disney OR Pixar OR A24 OR diretor OR sequência"
+    ),
+    "series": (
+        "série OR temporada OR Netflix OR HBO OR Max OR Disney+ OR Prime OR "
+        '"Apple TV" OR finale OR renovada OR cancelada OR spin-off OR "novo episódio"'
+    ),
+    "pop": (
+        'Taylor Swift OR Beyoncé OR BTS OR K-pop OR Anitta OR viral OR TikTok OR '
+        'celebridade OR "cultura pop" OR meme OR polêmica OR festival OR Grammy OR show'
+    ),
+    "atualidades": (
+        'Brasil OR Lula OR Congresso OR STF OR economia OR Selic OR inflação OR '
+        'Petrobras OR "em alta" OR trending OR governo OR aprovou'
+    ),
+    "ciencia": (
+        'NASA OR SpaceX OR Marte OR exoplaneta OR fóssil OR vacina OR '
+        '"descoberta científica" OR "novo estudo" OR pesquisa OR genética OR '
+        'clima OR oceano OR dinossauro OR "buraco negro"'
+    ),
+    "geek": (
+        'anime OR mangá OR Naruto OR "One Piece" OR Pokémon OR Nintendo OR '
+        'Switch OR PlayStation OR Xbox OR Steam OR RPG OR "novo jogo" OR '
+        'Marvel OR DC OR "Star Wars" OR "Harry Potter"'
+    ),
+}
+
+# Mapeia trilha → categoria do endpoint top-headlines do GNews.
+# Categorias válidas: general, world, nation, business, technology,
+# entertainment, sports, science, health. None = sem categoria editorial.
+TOPIC_TO_CATEGORY = {
+    "tech": "technology",
+    "cinema": "entertainment",
+    "series": "entertainment",
+    "pop": "entertainment",
+    "atualidades": "world",
+    "ciencia": "science",
+    "geek": None,  # sem categoria editorial relevante; só keyword search
 }
 
 TOPIC_LABELS = {
@@ -79,6 +119,35 @@ def _passes_filters(article: dict) -> bool:
     return True
 
 
+async def _gnews_get(
+    session: aiohttp.ClientSession,
+    endpoint: str,
+    params: dict,
+    *,
+    topic_key: str,
+    source_label: str,
+) -> list[dict]:
+    """Faz uma chamada GET ao GNews e devolve a lista de articles (ou [])."""
+    url = f"https://gnews.io/api/v4/{endpoint}"
+    try:
+        async with session.get(url, params=params) as resp:
+            if resp.status != 200:
+                body = await resp.text()
+                logger.warning(
+                    "gnews_http_error topic=%s endpoint=%s status=%s body=%s",
+                    topic_key, source_label, resp.status, body[:200],
+                )
+                return []
+            data = await resp.json()
+    except Exception as exc:
+        logger.warning(
+            "gnews_request_failed topic=%s endpoint=%s error=%s",
+            topic_key, source_label, type(exc).__name__,
+        )
+        return []
+    return data.get("articles", []) or []
+
+
 async def search_gnews_topic(
     topic_key: str,
     gnews_key: str,
@@ -88,40 +157,68 @@ async def search_gnews_topic(
     max_results: int = 5,
     timeout_seconds: int = 10,
 ) -> list[dict]:
-    """Busca uma trilha no GNews e devolve até max_results artigos filtrados."""
+    """Busca uma trilha combinando 2 fontes do GNews:
+      - top-headlines?category=... → manchetes editoriais da categoria (se houver)
+      - search?q=... → busca por keywords ricas da trilha
+
+    Devolve até ~max_results*2 artigos únicos por URL, intercalados pra dar
+    variedade (1 editorial, 1 keyword, 1 editorial, 1 keyword...). Articles
+    duplicados em ambas as fontes aparecem uma vez só."""
     query = TOPIC_QUERIES.get(topic_key)
     if not query:
         return []
 
-    params = {
-        "q": query,
-        "lang": lang,
-        "country": country,
-        "max": max_results,
-        "in": "title,description",
-        "apikey": gnews_key,
+    category = TOPIC_TO_CATEGORY.get(topic_key)
+
+    timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+    search_params = {
+        "q": query, "lang": lang, "country": country,
+        "max": max_results, "in": "title,description", "apikey": gnews_key,
     }
 
-    try:
-        timeout = aiohttp.ClientTimeout(total=timeout_seconds)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get("https://gnews.io/api/v4/search", params=params) as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    logger.warning(
-                        "gnews_http_error topic=%s status=%s body=%s",
-                        topic_key, resp.status, body[:200],
-                    )
-                    return []
-                data = await resp.json()
-    except Exception as exc:
-        logger.warning(
-            "gnews_request_failed topic=%s error=%s", topic_key, type(exc).__name__
-        )
-        return []
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        tasks = [_gnews_get(
+            session, "search", search_params,
+            topic_key=topic_key, source_label="search",
+        )]
+        if category:
+            headline_params = {
+                "category": category, "lang": lang, "country": country,
+                "max": max_results, "apikey": gnews_key,
+            }
+            tasks.append(_gnews_get(
+                session, "top-headlines", headline_params,
+                topic_key=topic_key, source_label="top-headlines",
+            ))
+        results = await asyncio.gather(*tasks)
 
-    articles = data.get("articles", []) or []
-    return [a for a in articles if _passes_filters(a)]
+    search_articles = results[0]
+    headline_articles = results[1] if len(results) > 1 else []
+
+    # Intercala (editorial primeiro pra dar prioridade ao que está bombando),
+    # depois dedupa por URL preservando ordem.
+    interleaved: list[dict] = []
+    for pair in zip(headline_articles, search_articles):
+        interleaved.extend(pair)
+    longer = headline_articles if len(headline_articles) > len(search_articles) else search_articles
+    interleaved.extend(longer[min(len(headline_articles), len(search_articles)):])
+
+    seen_urls: set[str] = set()
+    unique: list[dict] = []
+    for art in interleaved:
+        url = art.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        unique.append(art)
+
+    filtered = [a for a in unique if _passes_filters(a)]
+    logger.info(
+        "gnews_search topic=%s headlines=%d search=%d unique=%d kept=%d",
+        topic_key, len(headline_articles), len(search_articles),
+        len(unique), len(filtered),
+    )
+    return filtered
 
 
 def topics_for_hour(hour: int, enabled_topics: list[str] | None = None) -> list[str]:
