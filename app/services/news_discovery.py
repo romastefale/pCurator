@@ -176,24 +176,25 @@ async def search_gnews_topic(
         "max": max_results, "in": "title,description", "apikey": gnews_key,
     }
 
+    # GNews free tier limita a ~1 req/seg — chamadas SERIAIS com pausa curta
+    # entre elas. Em paralelo (asyncio.gather) o GNews devolve 429 na segunda.
     async with aiohttp.ClientSession(timeout=timeout) as session:
-        tasks = [_gnews_get(
-            session, "search", search_params,
-            topic_key=topic_key, source_label="search",
-        )]
+        headline_articles: list[dict] = []
         if category:
             headline_params = {
                 "category": category, "lang": lang, "country": country,
                 "max": max_results, "apikey": gnews_key,
             }
-            tasks.append(_gnews_get(
+            headline_articles = await _gnews_get(
                 session, "top-headlines", headline_params,
                 topic_key=topic_key, source_label="top-headlines",
-            ))
-        results = await asyncio.gather(*tasks)
+            )
+            await asyncio.sleep(1.2)  # respeita rate limit antes da próxima call
 
-    search_articles = results[0]
-    headline_articles = results[1] if len(results) > 1 else []
+        search_articles = await _gnews_get(
+            session, "search", search_params,
+            topic_key=topic_key, source_label="search",
+        )
 
     # Intercala (editorial primeiro pra dar prioridade ao que está bombando),
     # depois dedupa por URL preservando ordem.
