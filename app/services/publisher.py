@@ -1,5 +1,9 @@
+import logging
+
 from aiogram import Bot
 from aiogram.types import LinkPreviewOptions, Message
+
+logger = logging.getLogger(__name__)
 
 PHOTO_CAPTION_LIMIT = 1024
 
@@ -30,6 +34,11 @@ async def publish_post(bot: Bot, chat_id: int, post: dict) -> list[int]:
             sent_ids.append(sent.message_id)
             return sent_ids
 
+        logger.warning(
+            "caption_over_limit length=%d limit=%d — enviando 2 mensagens (foto + texto)",
+            len(caption),
+            PHOTO_CAPTION_LIMIT,
+        )
         photo_msg = await bot.send_photo(chat_id=chat_id, photo=image_ref)
         sent_ids.append(photo_msg.message_id)
         text_msg = await bot.send_message(

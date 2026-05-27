@@ -51,7 +51,9 @@ def validate_public_post(post: PublicPost, article: ArticleIntake) -> tuple[bool
     body_len = len(post.body.strip())
     if body_len < 120:
         issues.append("body_too_short")
-    if body_len > 750:
+    # 580 vem do orçamento de 1024 chars do sendPhoto.caption descontando
+    # title (120) + subtitle (180) + hashtags (~80) + tags HTML (~58) + \n\n (6).
+    if body_len > 580:
         issues.append("body_too_long")
 
     if _too_similar_to_extraction(post.body, article.clean_text):

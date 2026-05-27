@@ -22,7 +22,7 @@ def build_mira_prompt(article: ArticleIntake, channel_slug: str, risk_score: int
         + "responda em JSON puro, sem markdown e sem explicações.\n\n"
         + f"ID do pedido: {request_id}\n\n"
         + "Campos obrigatórios: hashtags, title, subtitle, body, source_url, needs_review, quality_notes.\n\n"
-        + "Regras: reescreva como resumo editorial para Telegram; não copie a raspagem; não use Via, Prévia editorial, Oferecido por, Por Redação ou Atualizado; não coloque fonte no título; termine em frase completa; use 3 ou 4 hashtags. O campo body deve ter 1 a 3 parágrafos curtos separados por duas quebras de linha (\\n\\n); cada parágrafo agrupa frases que pertencem à mesma ideia.\n\n"
+        + "Regras: reescreva como resumo editorial para Telegram; não copie a raspagem; não use Via, Prévia editorial, Oferecido por, Por Redação ou Atualizado; não coloque fonte no título; termine em frase completa; use 3 ou 4 hashtags. O campo body deve ter 1 a 3 parágrafos curtos separados por duas quebras de linha (\\n\\n); cada parágrafo agrupa frases que pertencem à mesma ideia. Body MÁXIMO 580 caracteres (preferível ~400) — acima disso a foto perde a legenda no Telegram.\n\n"
         + f"Canal: {channel_slug}\nRisco: {risk_score}\nFonte: {article.source}\nURL: {article.url}\nTítulo: {article.clean_title}\nTexto:\n{article.clean_text[:2600]}"
     )
     return request_id, prompt[:3900]

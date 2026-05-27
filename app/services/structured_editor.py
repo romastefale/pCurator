@@ -18,7 +18,7 @@ def _split_sentences(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?])\s+", clean) if part.strip()]
 
 
-def _complete_summary(text: str, max_chars: int = 680) -> str:
+def _complete_summary(text: str, max_chars: int = 580) -> str:
     sentences = _split_sentences(text)
     if not sentences:
         return "O conteúdo extraído precisa de revisão manual antes de publicação."
@@ -109,6 +109,7 @@ Regras obrigatórias:
 - O corpo deve ser jornalístico, curto, claro e sem clickbait.
 - O resumo deve terminar em frase completa, sem corte seco no meio da ideia.
 - Estruture o body em 1 a 3 parágrafos curtos separados por duas quebras de linha (\\n\\n). Cada parágrafo agrupa frases que pertencem à mesma ideia; não isole cada frase em parágrafo próprio.
+- O body deve ter no MÁXIMO 580 caracteres (limite rígido) — caso contrário a foto perde a legenda no Telegram. Prefira ~400 caracteres para folga.
 - Se a confiança for baixa, use linguagem cautelosa.
 - Se o assunto exigir cautela editorial, marque needs_review=true (a decisão de publicar é sempre humana).
 

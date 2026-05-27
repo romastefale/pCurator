@@ -1,0 +1,19 @@
+2026-05-27T00:24:46.529087526Z [info] Starting Container
+2026-05-27T00:24:46.763386445Z [info] Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/e86a9445-f072-487e-aaf1-0db44dc62e6f/vol_zqe7oxu0xdthfyjm
+2026-05-27T00:24:48.228393585Z [error] 2026-05-27 00:24:47,188 INFO aiogram.dispatcher Start polling
+2026-05-27T00:24:48.228401217Z [error] 2026-05-27 00:24:47,620 INFO aiogram.dispatcher Run polling for bot @tigraoCURATORbot id=8752347723 - 'pCURATOR'
+2026-05-27T00:29:08.791625540Z [error] 2026-05-27 00:29:05,327 INFO aiogram.event Update id=632417708 is handled. Duration 563 ms by bot id=8752347723
+2026-05-27T00:30:08.468691126Z [error] 2026-05-27 00:30:00,415 INFO aiogram.event Update id=632417709 is handled. Duration 1198 ms by bot id=8752347723
+2026-05-27T00:30:08.468695370Z [error] 2026-05-27 00:30:02,550 INFO app.callbacks callback_received data=duplicate:regenerate:29 user=8505890439
+2026-05-27T00:30:08.468698876Z [error] 2026-05-27 00:30:03,126 INFO aiogram.event Update id=632417710 is handled. Duration 577 ms by bot id=8752347723
+2026-05-27T00:30:08.468702661Z [error] 2026-05-27 00:30:05,758 INFO app.callbacks callback_received data=channel:c2 user=8505890439
+2026-05-27T00:30:08.468706543Z [error] 2026-05-27 00:30:06,627 INFO app.services.mira_bridge mira_request_sent request_id=910535f9781b message_id=1277
+2026-05-27T00:30:28.506654473Z [error] 2026-05-27 00:30:24,717 INFO app.services.mira_bridge mira_response_resolved request_id=910535f9781b
+2026-05-27T00:30:28.506657384Z [error] 2026-05-27 00:30:24,719 INFO aiogram.event Update id=632417712 is handled. Duration 2 ms by bot id=8752347723
+2026-05-27T00:30:28.506660046Z [error] 2026-05-27 00:30:25,603 INFO aiogram.event Update id=632417711 is handled. Duration 19845 ms by bot id=8752347723
+2026-05-27T00:30:48.188825445Z [error] 2026-05-27 00:30:41,017 INFO app.callbacks callback_received data=post:publish user=8505890439
+2026-05-27T00:30:48.188830232Z [error] 2026-05-27 00:30:41,568 INFO aiogram.event Update id=632417713 is handled. Duration 552 ms by bot id=8752347723
+2026-05-27T00:30:48.188833597Z [error] 2026-05-27 00:30:43,783 INFO app.callbacks callback_received data=dest:c2 user=8505890439
+2026-05-27T00:30:48.188836544Z [error] 2026-05-27 00:30:45,246 INFO aiogram.event Update id=632417714 is handled. Duration 1463 ms by bot id=8752347723
+2026-05-27T00:31:28.193963714Z [error] 2026-05-27 00:31:28,150 INFO app.callbacks callback_received data=post:confirm:38:c2 user=8505890439
+2026-05-27T00:31:29.809450120Z [error] 2026-05-27 00:31:29,495 INFO aiogram.event Update id=632417715 is handled. Duration 1346 ms by bot id=8752347723
