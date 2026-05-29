@@ -22,6 +22,14 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 #     visual respirar (não pintar tudo é tão importante quanto pintar).
 
 
+def _truncate_label(text: str, limit: int = 60) -> str:
+    """Trunca texto de botão inline (limite do Telegram é 64 chars) com reticências."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
 def review_keyboard(with_next: bool = False) -> InlineKeyboardMarkup:
     """Teclado de revisão — sempre permite publicar. O curador humano decide.
 
@@ -104,17 +112,24 @@ def confirm_keyboard(post_id: int, destination_slug: str) -> InlineKeyboardMarku
     )
 
 
-def destination_keyboard() -> InlineKeyboardMarkup:
-    """Escolha do CANAL DE DESTINO (passo 5), após revisão/edição."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="📘 Canal 1", callback_data="dest:c1", style=ButtonStyle.PRIMARY),
-                InlineKeyboardButton(text="📰 Canal 2", callback_data="dest:c2", style=ButtonStyle.PRIMARY),
-            ],
-            [InlineKeyboardButton(text="↩️ Voltar para revisão", callback_data="dest:back")],
+def destination_keyboard(channels: list[dict]) -> InlineKeyboardMarkup:
+    """Escolha do CANAL DE DESTINO (após revisão/edição).
+
+    Um botão por canal, exibindo o NOME REAL do canal (texto de botão não é
+    HTML, então o título cru é seguro aqui). O callback_data carrega o chat_id
+    pra rotear o envio sem depender de estado obsoleto da sessão."""
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=_truncate_label(ch["title"]),
+                callback_data=f"dest:{ch['chat_id']}",
+                style=ButtonStyle.PRIMARY,
+            )
         ]
-    )
+        for ch in channels
+    ]
+    rows.append([InlineKeyboardButton(text="↩️ Voltar para revisão", callback_data="dest:back")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def duplicate_keyboard(article_id: int) -> InlineKeyboardMarkup:
@@ -128,9 +143,19 @@ def duplicate_keyboard(article_id: int) -> InlineKeyboardMarkup:
     )
 
 
-def channel_label(channel_slug: str | None) -> str:
-    if channel_slug == "c1":
-        return "📘 Canal 1"
-    if channel_slug == "c2":
-        return "📰 Canal 2"
-    return "canal não definido"
+def team_keyboard(users: list[dict]) -> InlineKeyboardMarkup | None:
+    """Lista de co-autores, um botão de revogar por pessoa (linha cheia, então
+    pode passar de 12 chars). Retorna None se não houver ninguém."""
+    if not users:
+        return None
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=_truncate_label(f"🗑 Revogar {u.get('name') or u['user_id']}"),
+                callback_data=f"team:revoke:{u['user_id']}",
+                style=ButtonStyle.DANGER,
+            )
+        ]
+        for u in users
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)

@@ -3,7 +3,7 @@ import re
 from aiogram import F, Router
 from aiogram.types import Message
 
-from app.access import reject_message_if_not_owner
+from app.access import reject_message_if_not_allowed
 from app.services.article_extractor_v2 import extract_article_intake
 from app.services.fetcher import fetch_html
 from app.services.image_validation import head_confirms_image
@@ -30,7 +30,7 @@ async def handle_possible_link(message: Message) -> None:
     if not match:
         return
 
-    if await reject_message_if_not_owner(message):
+    if await reject_message_if_not_allowed(message):
         return
 
     settings = get_settings()

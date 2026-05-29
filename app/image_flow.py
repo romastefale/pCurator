@@ -1,7 +1,7 @@
 from aiogram import F, Router
 from aiogram.types import Message
 
-from app.access import reject_message_if_not_owner
+from app.access import reject_message_if_not_allowed
 from app.services.preview import send_post_preview
 from app.settings import get_settings
 from app.storage.events import log_event
@@ -20,7 +20,7 @@ async def handle_manual_image(message: Message) -> None:
     if mode != "edit_image" or post_id is None:
         return
 
-    if await reject_message_if_not_owner(message):
+    if await reject_message_if_not_allowed(message):
         return
 
     image_ref = message.photo[-1].file_id

@@ -1,10 +1,11 @@
+import html
 import logging
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
-from app.access import reject_callback_if_not_owner
+from app.access import reject_callback_if_not_allowed, reject_callback_if_not_owner
 from app.services.manual_discovery import (
     clear_search,
     fetch_next_for_search,
@@ -18,6 +19,8 @@ from app.services.regenerator import UNIFIED_TONE
 from app.services.review_delivery import generate_and_deliver_review
 from app.settings import Settings, get_settings
 from app.storage.articles import get_article
+from app.storage.authorized_users import list_authorized_users, revoke_authorized_user
+from app.storage.channels import get_channel, list_channels
 from app.storage.discovery_stats import get_today_count
 from app.storage.events import log_event
 from app.storage.posts import (
@@ -35,10 +38,10 @@ from app.storage.session import (
     try_claim_idle_session,
 )
 from app.ui import (
-    channel_label,
     confirm_keyboard,
     destination_keyboard,
     review_keyboard,
+    team_keyboard,
 )
 
 logger = logging.getLogger(__name__)
@@ -109,19 +112,31 @@ async def _active_post_id(callback: CallbackQuery) -> int | None:
     return post_id
 
 
-def _resolve_channel_id(channel_slug: str | None) -> int | None:
-    settings = get_settings()
-    if channel_slug == "c1":
-        return settings.channel_1_id
-    if channel_slug == "c2":
-        return settings.channel_2_id
-    return None
+async def _resolve_channel(
+    database_path: str, dest_token: str | None
+) -> tuple[int | None, str | None]:
+    """Resolve o token de destino (chat_id em texto) para (chat_id, título).
+    Retorna (None, None) se o canal não existe ou está desabilitado."""
+    try:
+        chat_id = int(dest_token)
+    except (TypeError, ValueError):
+        return None, None
+    channel = await get_channel(database_path, chat_id)
+    if not channel or not channel.get("is_enabled"):
+        return None, None
+    return channel["chat_id"], channel["title"]
+
+
+async def _dest_title(database_path: str, dest_token: str | None) -> str:
+    """Nome do canal pra exibir em mensagens (fallback se foi removido)."""
+    _, title = await _resolve_channel(database_path, dest_token)
+    return title or "canal indisponível"
 
 
 @router.callback_query(F.data.regexp(r"^duplicate:regenerate:\d+$"))
 async def duplicate_regenerate(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     await _delete_callback_message(callback)
@@ -179,7 +194,7 @@ async def duplicate_regenerate(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "duplicate:ignore")
 async def duplicate_ignore(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     await _delete_callback_message(callback)
@@ -193,7 +208,7 @@ async def duplicate_ignore(callback: CallbackQuery) -> None:
 async def review_publish(callback: CallbackQuery) -> None:
     """Após revisão, pergunta o canal de DESTINO (pode ser diferente do tom)."""
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     settings = get_settings()
@@ -222,18 +237,29 @@ async def review_publish(callback: CallbackQuery) -> None:
         )
         return
 
+    channels = await list_channels(settings.database_path)
+    if not channels:
+        await callback.message.answer(
+            "⚠️ Nenhum canal disponível para publicar.\n"
+            "Adicione o bot como <b>administrador</b> em um canal — ele aparece "
+            "aqui automaticamente com o nome real. Veja os canais detectados com /pc."
+        )
+        return
+
     await callback.message.answer(
         "📤 Texto pronto.\n"
         "Para qual canal você quer publicar?",
-        reply_markup=destination_keyboard(),
+        reply_markup=destination_keyboard(channels),
     )
 
 
-async def _prepare_destination_confirm(callback: CallbackQuery, destination_slug: str) -> None:
+async def _prepare_destination_confirm(callback: CallbackQuery, destination_token: str) -> None:
     settings = get_settings()
     post_id, _, _ = await get_active_context(settings.database_path, callback.from_user.id)
-    await _log_choice(callback, destination_slug, "destination_selected")
-    await callback.answer(f"{channel_label(destination_slug)} selecionado")
+
+    destination_id, dest_label = await _resolve_channel(settings.database_path, destination_token)
+    await _log_choice(callback, destination_token, "destination_selected")
+    await callback.answer(f"{dest_label or 'Canal'} selecionado")
 
     if not callback.message:
         return
@@ -245,10 +271,10 @@ async def _prepare_destination_confirm(callback: CallbackQuery, destination_slug
         await callback.message.answer("Nenhum rascunho ativo encontrado.")
         return
 
-    destination_id = _resolve_channel_id(destination_slug)
     if destination_id is None:
         await callback.message.answer(
-            f"⚠️ {channel_label(destination_slug)} não está configurado nas variáveis de ambiente."
+            "⚠️ Esse canal não está mais disponível (o bot pode ter sido removido). "
+            "Use /pc para ver os canais ativos."
         )
         return
 
@@ -263,52 +289,45 @@ async def _prepare_destination_confirm(callback: CallbackQuery, destination_slug
         )
         return
 
-    # Sessão passa a guardar o canal de DESTINO (sobrescreve o tom).
+    # Sessão passa a guardar o chat_id do canal de DESTINO (em texto).
     await set_active_post(
         settings.database_path,
         user_id=callback.from_user.id,
         post_id=post_id,
         mode="confirm",
-        channel_slug=destination_slug,
+        channel_slug=destination_token,
     )
 
-    dest_label = channel_label(destination_slug)
+    safe_label = html.escape(dest_label or "canal")
 
     tracked: list[int] = []
     header = await callback.message.answer(
-        f"🔎 Pré-visualização final para {dest_label} — post #{post_id}.\n"
+        f"🔎 Pré-visualização final para <b>{safe_label}</b> — post #{post_id}.\n"
         "Esta é exatamente a forma como será enviada:"
     )
     tracked.append(header.message_id)
     tracked.extend(await send_post_preview(callback.bot, callback.message.chat.id, post))
     confirm_msg = await callback.message.answer(
-        f"Confirma o envio para {dest_label}?",
-        reply_markup=confirm_keyboard(post_id, destination_slug),
+        f"Confirma o envio para <b>{safe_label}</b>?",
+        reply_markup=confirm_keyboard(post_id, destination_token),
     )
     tracked.append(confirm_msg.message_id)
     await set_last_preview_message_ids(settings.database_path, callback.from_user.id, tracked)
 
 
-@router.callback_query(F.data == "dest:c1")
-async def destination_c1(callback: CallbackQuery) -> None:
+@router.callback_query(F.data.regexp(r"^dest:-?\d+$"))
+async def destination_selected(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
-    await _prepare_destination_confirm(callback, "c1")
-
-
-@router.callback_query(F.data == "dest:c2")
-async def destination_c2(callback: CallbackQuery) -> None:
-    _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
-        return
-    await _prepare_destination_confirm(callback, "c2")
+    destination_token = (callback.data or "").split(":", 1)[1]
+    await _prepare_destination_confirm(callback, destination_token)
 
 
 @router.callback_query(F.data == "dest:back")
 async def destination_back(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     await _delete_callback_message(callback)
@@ -336,10 +355,10 @@ async def destination_back(callback: CallbackQuery) -> None:
         )
 
 
-@router.callback_query(F.data.regexp(r"^post:confirm:\d+:(c1|c2)$"))
+@router.callback_query(F.data.regexp(r"^post:confirm:\d+:-?\d+$"))
 async def review_confirm(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     parts = (callback.data or "").split(":")
@@ -379,10 +398,14 @@ async def review_confirm(callback: CallbackQuery) -> None:
     channel_slug = button_destination
     post_id = button_post_id
 
-    channel_id = _resolve_channel_id(channel_slug)
+    channel_id, channel_title = await _resolve_channel(settings.database_path, channel_slug)
     if channel_id is None:
-        await callback.message.answer("Canal de destino não configurado para este rascunho.")
+        await callback.message.answer(
+            "⚠️ Canal de destino indisponível (o bot pode ter sido removido). "
+            "Use /pc para ver os canais ativos."
+        )
         return
+    safe_label = html.escape(channel_title or "canal")
 
     post = await get_post(settings.database_path, post_id)
     if not post:
@@ -434,7 +457,7 @@ async def review_confirm(callback: CallbackQuery) -> None:
         )
         await _log_choice(callback, channel_slug, "publish_failed")
         await callback.message.answer(
-            f"❌ Falha ao publicar post #{post_id} em {channel_label(channel_slug)}: {type(exc).__name__}.\n"
+            f"❌ Falha ao publicar post #{post_id} em {safe_label}: {type(exc).__name__}.\n"
             "⚠️ Verifique o canal antes de tentar de novo — parte do conteúdo pode ter sido enviada.\n"
             f"O post ficou marcado como 'failed'. Use <code>/pfr {post_id}</code> para reabrir após verificar."
         )
@@ -450,7 +473,7 @@ async def review_confirm(callback: CallbackQuery) -> None:
     )
     await _log_choice(callback, channel_slug, "published")
     await callback.message.answer(
-        f"✅ Post #{post_id} publicado em {channel_label(channel_slug)}.\n"
+        f"✅ Post #{post_id} publicado em {safe_label}.\n"
         "Envie o próximo link quando quiser."
     )
 
@@ -458,7 +481,7 @@ async def review_confirm(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "post:cancel_confirm")
 async def review_cancel_confirm(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     await _delete_callback_message(callback)
@@ -484,16 +507,59 @@ async def review_cancel_confirm(callback: CallbackQuery) -> None:
         )
 
     if callback.message:
+        dest_label = await _dest_title(settings.database_path, channel_slug)
         await callback.message.answer(
-            f"Envio para {channel_label(channel_slug)} cancelado. O rascunho continua disponível.",
+            f"Envio para {html.escape(dest_label)} cancelado. O rascunho continua disponível.",
             reply_markup=review_keyboard(),
+        )
+
+
+def _team_list_text(users: list[dict]) -> str:
+    if not users:
+        return (
+            "<b>Equipe (co-autores)</b>\n\n"
+            "Nenhum co-autor autorizado.\n\n"
+            "Autorizar alguém: <code>/pea ID Nome</code>"
+        )
+    lines = "\n".join(
+        f"• {html.escape(u.get('name') or 'sem nome')} — <code>{u['user_id']}</code>"
+        for u in users
+    )
+    return (
+        "<b>Equipe (co-autores)</b>\n\n"
+        f"{lines}\n\n"
+        "Toque para revogar o acesso. Autorizar mais: <code>/pea ID Nome</code>"
+    )
+
+
+@router.callback_query(F.data.regexp(r"^team:revoke:\d+$"))
+async def team_revoke(callback: CallbackQuery) -> None:
+    """Revoga um co-autor (apenas o dono pode)."""
+    _log_callback_received(callback)
+    if await reject_callback_if_not_owner(callback):
+        return
+
+    settings = get_settings()
+    try:
+        target_id = int((callback.data or "").split(":")[2])
+    except (IndexError, ValueError):
+        await callback.answer("Botão inválido", show_alert=True)
+        return
+
+    revoked = await revoke_authorized_user(settings.database_path, target_id)
+    await callback.answer("Acesso revogado" if revoked else "Já estava revogado")
+
+    users = await list_authorized_users(settings.database_path)
+    if callback.message:
+        await callback.message.edit_text(
+            _team_list_text(users), reply_markup=team_keyboard(users)
         )
 
 
 @router.callback_query(F.data == "post:edit")
 async def review_edit(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     post_id = await _active_post_id(callback)
@@ -514,7 +580,7 @@ async def review_edit(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "post:image")
 async def review_image(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     post_id = await _active_post_id(callback)
@@ -608,7 +674,7 @@ async def _deliver_next_manual_draft(
 @router.callback_query(F.data.startswith("discover:"))
 async def discover_topic_picked(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     topic = callback.data.split(":", 1)[1]
@@ -657,7 +723,7 @@ async def discover_topic_picked(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "post:next")
 async def review_next(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     settings = get_settings()
@@ -722,7 +788,7 @@ async def review_next(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "post:ignore")
 async def review_ignore(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
+    if await reject_callback_if_not_allowed(callback):
         return
 
     await _delete_callback_message(callback)

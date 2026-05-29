@@ -3,6 +3,15 @@ from app.commands import router as commands_router
 from app.edit_flow import router as edit_router
 from app.image_flow import router as image_router
 from app.link_flow import router as link_router
+from app.membership import router as membership_router
 from app.mira_flow import router as mira_router
 
-ROUTERS = (commands_router, mira_router, link_router, image_router, edit_router, callback_router)
+ROUTERS = (
+    commands_router,
+    mira_router,
+    link_router,
+    image_router,
+    edit_router,
+    callback_router,
+    membership_router,
+)

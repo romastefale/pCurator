@@ -27,4 +27,20 @@ async def apply_migrations(database_path: str) -> None:
         if "last_preview_message_ids" not in session_columns:
             await db.execute("ALTER TABLE editorial_sessions ADD COLUMN last_preview_message_ids TEXT")
 
+        channel_columns = await _columns(db, "channels")
+        if "username" not in channel_columns:
+            await db.execute("ALTER TABLE channels ADD COLUMN username TEXT")
+        if "updated_at" not in channel_columns:
+            await db.execute("ALTER TABLE channels ADD COLUMN updated_at TEXT")
+        # Desduplica por chat_id antes do índice UNIQUE: mantém o rowid mais alto
+        # (linha mais recente) por chat_id, senão o CREATE INDEX falharia em bases
+        # antigas com duplicatas e travaria o startup.
+        await db.execute(
+            "DELETE FROM channels WHERE rowid NOT IN "
+            "(SELECT MAX(rowid) FROM channels GROUP BY chat_id)"
+        )
+        await db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_channels_chat_id ON channels(chat_id)"
+        )
+
         await db.commit()
