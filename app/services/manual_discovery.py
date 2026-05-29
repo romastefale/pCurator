@@ -5,6 +5,7 @@ from aiogram import Bot
 
 from app.services.auto_draft import create_auto_draft
 from app.services.news_discovery import search_gnews_topic
+from app.services.regenerator import UNIFIED_TONE
 from app.settings import Settings
 from app.storage.discovery_stats import increment_today_count
 
@@ -80,7 +81,7 @@ async def fetch_next_for_search(
                 database_path=settings.database_path,
                 raw_url=url,
                 linkpreview_key=settings.linkpreview_key,
-                default_channel="c1",
+                default_channel=UNIFIED_TONE,
                 discovered_topic=state.topic,
             )
             if not result:

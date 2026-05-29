@@ -8,6 +8,7 @@ from aiogram import Bot
 from app.services.auto_draft import create_auto_draft
 from app.services.news_discovery import TOPIC_LABELS, search_gnews_topic, topics_for_hour
 from app.services.preview import send_post_preview
+from app.services.regenerator import UNIFIED_TONE
 from app.settings import Settings
 from app.storage.discovery_stats import get_today_count, increment_today_count
 from app.storage.posts import get_post
@@ -88,7 +89,7 @@ async def _notify_owner(
         user_id=owner_id,
         post_id=post_id,
         mode="review",
-        channel_slug="c1",
+        channel_slug=UNIFIED_TONE,
     )
     if not claimed:
         logger.info("auto_draft_deferred_owner_busy post=%s", post_id)
@@ -108,8 +109,8 @@ async def _notify_owner(
         instr = await bot.send_message(
             chat_id=owner_id,
             text=(
-                "Acima a prévia (tom C1 padrão).\n"
-                "Você pode publicar, trocar o tom, editar ou ignorar."
+                "Acima a prévia.\n"
+                "Você pode publicar, editar, trocar a imagem ou ignorar."
             ),
             reply_markup=review_keyboard(),
         )
@@ -182,7 +183,7 @@ async def _run_cycle(bot: Bot, settings: Settings) -> None:
                 database_path=settings.database_path,
                 raw_url=url,
                 linkpreview_key=settings.linkpreview_key,
-                default_channel="c1",
+                default_channel=UNIFIED_TONE,
                 discovered_topic=topic,
             )
             if not result:

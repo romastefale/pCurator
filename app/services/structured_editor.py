@@ -90,9 +90,9 @@ async def generate_structured_public_post(article: ArticleIntake, channel_slug: 
         return _fallback_public_post(article, channel_slug, "openai_key_missing")
 
     channel_hint = (
-        "Canal 1: leve, pop, cultura digital, celebridades, comportamento e entretenimento. Evite política, religião, crime pesado, tragédia e tema excessivamente sensível."
-        if channel_slug == "c1"
-        else "Canal 2: jornalístico, sério, público adulto, com linguagem direta, cautelosa e imparcial."
+        "Tom neutro e versátil (serve para público amplo): claro, direto e informativo, "
+        "nem coloquial/pop demais nem formal/acadêmico demais. Linguagem acessível, sem "
+        "gírias excessivas e sem jargão técnico."
     )
 
     prompt = f"""
@@ -113,8 +113,7 @@ Regras obrigatórias:
 - Se a confiança for baixa, use linguagem cautelosa.
 - Se o assunto exigir cautela editorial, marque needs_review=true (a decisão de publicar é sempre humana).
 
-Canal: {channel_slug}
-Critério do canal: {channel_hint}
+Tom editorial: {channel_hint}
 Risco editorial calculado: {risk_score}
 Fonte: {article.source}
 URL: {article.url}

@@ -37,7 +37,7 @@ from app.storage.sources import (
     update_source_score,
     upsert_source,
 )
-from app.ui import channel_label, discover_topic_keyboard, review_keyboard
+from app.ui import discover_topic_keyboard, review_keyboard
 
 router = Router()
 
@@ -63,17 +63,16 @@ async def help_command(message: Message) -> None:
         "<b>Comandos pCurator</b>\n\n"
         "<b>Fluxo de publicação</b>\n"
         "1. Envie o link da matéria.\n"
-        "2. Escolha o <b>tom</b> de geração: 🎨 Canal 1 ou 🎨 Canal 2.\n"
-        "3. Receba a prévia exata e revise: ✏️ Editar texto, 🖼 Trocar imagem ou 🚫 Ignorar.\n"
-        "4. Clique em ✅ Publicar para escolher o <b>canal de destino</b> (pode ser diferente do tom).\n"
-        "5. Confirme o envio na prévia final.\n\n"
+        "2. Receba a prévia exata (gerada automaticamente) e revise: ✏️ Editar texto, 🖼 Trocar imagem ou 🚫 Ignorar.\n"
+        "3. Clique em ✅ Publicar para escolher o <b>canal de destino</b> (📘 Canal 1 ou 📰 Canal 2).\n"
+        "4. Confirme o envio na prévia final.\n\n"
         "<b>Comandos gerais</b>\n"
         "/start — estado inicial\n"
         "/ph — ajuda rápida\n"
         "/ps — status técnico\n"
         "/pq — fila editorial\n"
         "/pfr ID — reabrir post 'failed' como rascunho\n"
-        "/buscar — pedir uma notícia agora (escolhe a trilha, gera prévia C1, botão ⏭ Próxima para descartar e pedir outra)\n\n"
+        "/buscar — pedir uma notícia agora (escolhe a trilha, gera a prévia, botão ⏭ Próxima para descartar e pedir outra)\n\n"
         "<b>Fontes</b>\n"
         "/pf — listar fontes\n"
         "/pfa Nome | url | escopo | nota — cadastrar fonte\n"
@@ -270,9 +269,8 @@ async def reopen_failed_command(message: Message) -> None:
         channel_slug=channel_slug,
     )
 
-    label = channel_label(channel_slug)
     await message.answer(
-        f"♻️ Post #{post_id} reaberto como rascunho para {label}.\n"
+        f"♻️ Post #{post_id} reaberto como rascunho.\n"
         "Confirme se a publicação anterior **não** saiu antes de tentar de novo."
     )
     refreshed = await get_post(settings.database_path, post_id)

@@ -38,7 +38,6 @@ def review_keyboard(with_next: bool = False) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🖼 Trocar imagem", callback_data="post:image"),
         ],
         [
-            InlineKeyboardButton(text="🎭 Trocar tom", callback_data="post:change_tone"),
             InlineKeyboardButton(
                 text="🚫 Ignorar",
                 callback_data="post:ignore",
@@ -101,19 +100,6 @@ def confirm_keyboard(post_id: int, destination_slug: str) -> InlineKeyboardMarku
                     style=ButtonStyle.DANGER,
                 ),
             ],
-        ]
-    )
-
-
-def channel_keyboard() -> InlineKeyboardMarkup:
-    """Escolha de TOM editorial (passo 2). Gera a prévia com o estilo de cada canal."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="🎨 Canal 1", callback_data="channel:c1", style=ButtonStyle.PRIMARY),
-                InlineKeyboardButton(text="🎨 Canal 2", callback_data="channel:c2", style=ButtonStyle.PRIMARY),
-            ],
-            [InlineKeyboardButton(text="🚫 Ignorar", callback_data="channel:ignore", style=ButtonStyle.DANGER)],
         ]
     )
 

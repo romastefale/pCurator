@@ -13,9 +13,10 @@ from app.services.text_utils import clean_url, stable_hash
 from app.settings import get_settings
 from app.storage.items import find_duplicate_item, save_item
 from app.storage.posts import save_post
+from app.services.review_delivery import generate_and_deliver_review
 from app.storage.session import set_active_post
 from app.types import ArticleIntake
-from app.ui import channel_keyboard, duplicate_keyboard
+from app.ui import duplicate_keyboard
 
 router = Router()
 
@@ -111,7 +112,7 @@ async def handle_possible_link(message: Message) -> None:
         settings.database_path,
         article_id=item_id,
         channel_slug="manual",
-        caption_html="Rascunho interno criado. Escolha C1 ou C2 para gerar o post editorial final.",
+        caption_html="Rascunho interno criado — gerando legenda editorial...",
         image_url=intake.image_url,
     )
     await set_active_post(
@@ -122,7 +123,7 @@ async def handle_possible_link(message: Message) -> None:
     )
 
     image_status = "imagem encontrada" if intake.image_url else "sem imagem confiável ainda"
-    await message.answer(
+    status_msg = await message.answer(
         "<b>Matéria recebida para curadoria.</b>\n\n"
         f"Item #{item_id}\n"
         f"Post #{post_id}\n"
@@ -131,6 +132,13 @@ async def handle_possible_link(message: Message) -> None:
         f"Texto extraído: {len(intake.clean_text)} caracteres\n"
         f"Imagem: {image_status}\n"
         f"Risco editorial: {risk['score']}\n\n"
-        "Escolha o canal para gerar a legenda editorial final.",
-        reply_markup=channel_keyboard(),
+        "🎨 Gerando a prévia editorial..."
+    )
+    await generate_and_deliver_review(
+        message.bot,
+        settings.database_path,
+        chat_id=message.chat.id,
+        user_id=message.from_user.id,
+        post_id=post_id,
+        status_message_id=status_msg.message_id,
     )

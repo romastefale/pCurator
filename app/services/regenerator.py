@@ -14,6 +14,12 @@ from app.types import ArticleIntake
 
 logger = logging.getLogger(__name__)
 
+# Tom editorial ÚNICO (neutro: claro e direto, nem pop demais nem formal demais).
+# Substitui a antiga escolha c1/c2; o mesmo tom serve pros dois canais e a escolha
+# de canal vira só destino de publicação. Definido aqui (orquestrador de geração)
+# pra ser importável por todo o pipeline sem dependências pesadas.
+UNIFIED_TONE = "geral"
+
 
 def _engine_from_notes(quality_notes: list[str]) -> str:
     if "mira_used" in quality_notes:

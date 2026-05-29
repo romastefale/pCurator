@@ -14,7 +14,8 @@ from app.services.manual_discovery import (
 from app.services.news_discovery import TOPIC_LABELS
 from app.services.preview import send_post_preview
 from app.services.publisher import publish_post
-from app.services.regenerator import regenerate_post_for_channel
+from app.services.regenerator import UNIFIED_TONE
+from app.services.review_delivery import generate_and_deliver_review
 from app.settings import Settings, get_settings
 from app.storage.articles import get_article
 from app.storage.discovery_stats import get_today_count
@@ -23,7 +24,6 @@ from app.storage.posts import (
     get_post,
     save_post,
     try_lock_post_for_publish,
-    update_post_channel_slug,
     update_post_status,
 )
 from app.storage.session import (
@@ -35,7 +35,6 @@ from app.storage.session import (
     try_claim_idle_session,
 )
 from app.ui import (
-    channel_keyboard,
     channel_label,
     confirm_keyboard,
     destination_keyboard,
@@ -88,21 +87,6 @@ def _log_callback_received(callback: CallbackQuery) -> None:
     )
 
 
-def _generation_warning(metadata: dict) -> str | None:
-    if not metadata.get("ok"):
-        return "⚠️ Não consegui gerar a prévia editorial. Verifique os logs do Railway."
-
-    engine = metadata.get("engine")
-    if engine == "mira":
-        return None
-
-    notes = ", ".join(metadata.get("quality_notes") or []) or "sem detalhes"
-    if engine == "openai":
-        return f"⚠️ Mira não respondeu. Foi usado fallback OpenAI.\nMotivo: {notes}"
-
-    return f"⚠️ Mira e OpenAI não foram usadas com sucesso. Foi usado fallback local.\nMotivo: {notes}"
-
-
 async def _log_choice(callback: CallbackQuery, channel_slug: str | None, event_type: str) -> None:
     settings = get_settings()
     post_id, active_channel, mode = await get_active_context(settings.database_path, callback.from_user.id)
@@ -134,70 +118,6 @@ def _resolve_channel_id(channel_slug: str | None) -> int | None:
     return None
 
 
-async def _prepare_channel_review(callback: CallbackQuery, channel_slug: str, label: str) -> None:
-    _log_callback_received(callback)
-    settings = get_settings()
-    post_id = await _active_post_id(callback)
-    await set_active_post(
-        settings.database_path,
-        user_id=callback.from_user.id,
-        post_id=post_id,
-        mode="review",
-        channel_slug=channel_slug,
-    )
-    await _log_choice(callback, channel_slug, "channel_selected")
-    await callback.answer(f"{label} selecionado")
-
-    if not callback.message:
-        return
-
-    if post_id is None:
-        await callback.message.answer("Nenhum rascunho ativo encontrado.")
-        return
-
-    # Apaga o prompt "novo item / escolha o canal" — confirmação obsoleta.
-    await _delete_callback_message(callback)
-
-    status_msg = await callback.message.answer(
-        f"🎨 Gerando prévia com o tom de {label} (a escolha do canal de destino vem depois)..."
-    )
-    tracked_status_id = status_msg.message_id
-    # Persiste o tom no próprio post pra /pfr e auditoria reabrirem com o tom original.
-    await update_post_channel_slug(settings.database_path, post_id, channel_slug)
-    metadata = await regenerate_post_for_channel(
-        settings.database_path,
-        post_id=post_id,
-        channel_slug=channel_slug,
-        bot=callback.bot,
-    )
-    post = await get_post(settings.database_path, post_id)
-
-    tracked: list[int] = [tracked_status_id]
-    if metadata.get("ok") and post:
-        tracked.extend(await send_post_preview(callback.bot, callback.message.chat.id, post))
-
-    warning = _generation_warning(metadata)
-    if warning:
-        warn_msg = await callback.message.answer(warning)
-        tracked.append(warn_msg.message_id)
-
-    if metadata.get("ok"):
-        instruction = (
-            f"Acima está a prévia exata (tom de {label}).\n"
-            "Você pode editar o texto, trocar a imagem ou avançar para escolher o canal de publicação."
-        )
-    else:
-        instruction = (
-            f"Não foi possível gerar a prévia automaticamente (tom de {label}).\n"
-            "Você pode editar o texto manualmente, trocar a imagem ou tentar gerar outro tom."
-        )
-    instr_msg = await callback.message.answer(
-        instruction, reply_markup=review_keyboard()
-    )
-    tracked.append(instr_msg.message_id)
-    await set_last_preview_message_ids(settings.database_path, callback.from_user.id, tracked)
-
-
 @router.callback_query(F.data.regexp(r"^duplicate:regenerate:\d+$"))
 async def duplicate_regenerate(callback: CallbackQuery) -> None:
     _log_callback_received(callback)
@@ -219,7 +139,7 @@ async def duplicate_regenerate(callback: CallbackQuery) -> None:
             settings.database_path,
             article_id=article_id,
             channel_slug="manual",
-            caption_html="Novo rascunho interno criado a partir de item duplicado. Escolha C1 ou C2 para gerar o post editorial final.",
+            caption_html="Novo rascunho interno criado a partir de item duplicado — gerando legenda editorial...",
             image_url=article.get("image_url"),
         )
         await set_active_post(
@@ -232,13 +152,20 @@ async def duplicate_regenerate(callback: CallbackQuery) -> None:
         await callback.answer("Novo rascunho criado")
 
         if callback.message:
-            await callback.message.answer(
+            status_msg = await callback.message.answer(
                 "🔁 Novo rascunho criado a partir da matéria duplicada.\n\n"
                 f"Item #{article_id}\n"
                 f"Post #{post_id}\n"
                 f"Título: {article.get('title') or 'Sem título'}\n\n"
-                "Escolha o canal para gerar a legenda editorial final.",
-                reply_markup=channel_keyboard(),
+                "🎨 Gerando a prévia editorial..."
+            )
+            await generate_and_deliver_review(
+                callback.bot,
+                settings.database_path,
+                chat_id=callback.message.chat.id,
+                user_id=callback.from_user.id,
+                post_id=post_id,
+                status_message_id=status_msg.message_id,
             )
     except Exception as exc:
         logger.exception("Duplicate regenerate callback failed: %s", type(exc).__name__)
@@ -260,41 +187,6 @@ async def duplicate_ignore(callback: CallbackQuery) -> None:
     await callback.answer("Ignorado")
     if callback.message:
         await callback.message.answer("🚫 Matéria duplicada ignorada.")
-
-
-@router.callback_query(F.data == "channel:c1")
-async def choose_c1(callback: CallbackQuery) -> None:
-    if await reject_callback_if_not_owner(callback):
-        return
-    await _prepare_channel_review(callback, "c1", "📘 Canal 1")
-
-
-@router.callback_query(F.data == "channel:c2")
-async def choose_c2(callback: CallbackQuery) -> None:
-    if await reject_callback_if_not_owner(callback):
-        return
-    await _prepare_channel_review(callback, "c2", "📰 Canal 2")
-
-
-@router.callback_query(F.data == "channel:ignore")
-async def ignore_channel(callback: CallbackQuery) -> None:
-    _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
-        return
-
-    await _delete_callback_message(callback)
-    await _log_choice(callback, None, "channel_ignored")
-    settings = get_settings()
-    await set_active_post(
-        settings.database_path,
-        user_id=callback.from_user.id,
-        post_id=None,
-        mode=None,
-        clear_channel=True,
-    )
-    await callback.answer("Ignorado")
-    if callback.message:
-        await callback.message.answer("🚫 Rascunho ignorado.")
 
 
 @router.callback_query(F.data == "post:publish")
@@ -330,9 +222,8 @@ async def review_publish(callback: CallbackQuery) -> None:
         )
         return
 
-    tone_label = channel_label(channel_slug)
     await callback.message.answer(
-        f"📤 Texto pronto (tom de {tone_label}).\n"
+        "📤 Texto pronto.\n"
         "Para qual canal você quer publicar?",
         reply_markup=destination_keyboard(),
     )
@@ -340,7 +231,7 @@ async def review_publish(callback: CallbackQuery) -> None:
 
 async def _prepare_destination_confirm(callback: CallbackQuery, destination_slug: str) -> None:
     settings = get_settings()
-    post_id, tone_slug, _ = await get_active_context(settings.database_path, callback.from_user.id)
+    post_id, _, _ = await get_active_context(settings.database_path, callback.from_user.id)
     await _log_choice(callback, destination_slug, "destination_selected")
     await callback.answer(f"{channel_label(destination_slug)} selecionado")
 
@@ -382,13 +273,10 @@ async def _prepare_destination_confirm(callback: CallbackQuery, destination_slug
     )
 
     dest_label = channel_label(destination_slug)
-    tone_note = ""
-    if tone_slug and tone_slug != destination_slug:
-        tone_note = f" (gerado com tom de {channel_label(tone_slug)})"
 
     tracked: list[int] = []
     header = await callback.message.answer(
-        f"🔎 Pré-visualização final para {dest_label}{tone_note} — post #{post_id}.\n"
+        f"🔎 Pré-visualização final para {dest_label} — post #{post_id}.\n"
         "Esta é exatamente a forma como será enviada:"
     )
     tracked.append(header.message_id)
@@ -644,26 +532,6 @@ async def review_image(callback: CallbackQuery) -> None:
         await callback.message.answer(f"🖼 Envie a nova imagem para o post #{post_id}.")
 
 
-@router.callback_query(F.data == "post:change_tone")
-async def review_change_tone(callback: CallbackQuery) -> None:
-    _log_callback_received(callback)
-    if await reject_callback_if_not_owner(callback):
-        return
-
-    await _delete_callback_message(callback)
-    if callback.message:
-        await _delete_tracked_previews(
-            callback.bot, callback.message.chat.id, callback.from_user.id
-        )
-    await _log_choice(callback, None, "change_tone_requested")
-    await callback.answer("Escolha o novo tom")
-    if callback.message:
-        await callback.message.answer(
-            "🎭 Escolha o novo tom para regenerar a prévia:",
-            reply_markup=channel_keyboard(),
-        )
-
-
 async def _deliver_next_manual_draft(
     bot: Bot,
     settings: Settings,
@@ -671,8 +539,8 @@ async def _deliver_next_manual_draft(
     chat_id: int,
     topic: str,
 ) -> bool:
-    """Busca próxima notícia da trilha, cria rascunho C1, reserva sessão e
-    envia prévia com botão ⏭ Próxima. Devolve True se entregou."""
+    """Busca próxima notícia da trilha, cria rascunho (tom único), reserva
+    sessão e envia prévia com botão ⏭ Próxima. Devolve True se entregou."""
     result = await fetch_next_for_search(bot, settings, user_id)
     if not result:
         return False
@@ -684,7 +552,7 @@ async def _deliver_next_manual_draft(
         user_id=user_id,
         post_id=post_id,
         mode="review",
-        channel_slug="c1",
+        channel_slug=UNIFIED_TONE,
     )
     if not claimed:
         await bot.send_message(
@@ -714,8 +582,8 @@ async def _deliver_next_manual_draft(
         instr = await bot.send_message(
             chat_id=chat_id,
             text=(
-                "Acima a prévia (tom C1 padrão).\n"
-                "Publique, troque o tom, edite, ignore ou peça a próxima."
+                "Acima a prévia.\n"
+                "Publique, edite, troque a imagem, ignore ou peça a próxima."
             ),
             reply_markup=review_keyboard(with_next=True),
         )

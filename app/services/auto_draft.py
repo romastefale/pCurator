@@ -6,7 +6,7 @@ from app.services.article_extractor_v2 import extract_article_intake
 from app.services.fetcher import fetch_html
 from app.services.image_validation import head_confirms_image
 from app.services.linkpreview import fetch_linkpreview
-from app.services.regenerator import regenerate_post_for_channel
+from app.services.regenerator import UNIFIED_TONE, regenerate_post_for_channel
 from app.services.text_utils import clean_url, stable_hash
 from app.storage.items import find_duplicate_item, save_item_with_flag
 from app.storage.posts import save_post
@@ -21,7 +21,7 @@ async def create_auto_draft(
     database_path: str,
     raw_url: str,
     linkpreview_key: str | None = None,
-    default_channel: str = "c1",
+    default_channel: str = UNIFIED_TONE,
     discovered_topic: str | None = None,
 ) -> tuple[int, ArticleIntake] | None:
     """Cria um rascunho a partir de URL descoberta automaticamente.
