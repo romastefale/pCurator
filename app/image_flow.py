@@ -4,7 +4,8 @@ import logging
 from aiogram import F, Router
 from aiogram.types import Message
 
-from app.access import reject_message_if_not_allowed
+from app.access import is_owner_id, reject_message_if_not_allowed
+from app.published import apply_published_images_edit
 from app.services.preview import send_post_preview
 from app.settings import get_settings
 from app.storage.events import log_event
@@ -16,6 +17,9 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 MAX_ALBUM = 4
+# Modos de envio de foto que este handler atende. 'edit_image' = rascunho em
+# revisão; 'edit_published_image' = trocar foto de publicação já no ar (owner).
+SUPPORTED_MODES = {"edit_image", "edit_published_image"}
 # O Telegram entrega álbum como mensagens separadas (mesmo media_group_id), uma
 # de cada vez. Esperamos um instante por mais fotos do mesmo grupo antes de aplicar.
 ALBUM_DEBOUNCE_SECONDS = 1.2
@@ -80,6 +84,44 @@ async def _apply_images(
     await set_last_preview_message_ids(settings.database_path, user_id, tracked)
 
 
+async def _dispatch_apply(
+    *,
+    bot,
+    chat_id: int,
+    user_id: int,
+    post_id: int,
+    mode: str,
+    refs: list[str],
+    truncated: bool,
+) -> None:
+    """Roteia a aplicação das fotos conforme o modo: rascunho vs publicação."""
+    if mode == "edit_image":
+        await _apply_images(
+            bot=bot,
+            chat_id=chat_id,
+            user_id=user_id,
+            post_id=post_id,
+            refs=refs,
+            truncated=truncated,
+        )
+        return
+
+    if mode == "edit_published_image":
+        if not is_owner_id(user_id):
+            return
+        ok, info = await apply_published_images_edit(bot, user_id, post_id, refs)
+        if ok:
+            settings = get_settings()
+            await set_active_post(
+                settings.database_path,
+                user_id=user_id,
+                post_id=None,
+                mode=None,
+                clear_channel=True,
+            )
+        await bot.send_message(chat_id, info)
+
+
 async def _flush_album(key: tuple[int, str]) -> None:
     """Aplica o álbum acumulado após a janela de debounce."""
     try:
@@ -96,19 +138,20 @@ async def _flush_album(key: tuple[int, str]) -> None:
     # sobrescreveria a sessão atual.
     settings = get_settings()
     active_post_id, active_mode = await get_active_post(settings.database_path, buf["user_id"])
-    if active_mode != "edit_image" or active_post_id != buf["post_id"]:
+    if active_mode != buf["mode"] or active_post_id != buf["post_id"]:
         logger.info(
-            "álbum descartado: contexto mudou (esperado post=%s edit_image, atual post=%s mode=%s)",
-            buf["post_id"], active_post_id, active_mode,
+            "álbum descartado: contexto mudou (esperado post=%s mode=%s, atual post=%s mode=%s)",
+            buf["post_id"], buf["mode"], active_post_id, active_mode,
         )
         return
 
     try:
-        await _apply_images(
+        await _dispatch_apply(
             bot=buf["bot"],
             chat_id=buf["chat_id"],
             user_id=buf["user_id"],
             post_id=buf["post_id"],
+            mode=buf["mode"],
             refs=buf["refs"],
             truncated=buf["truncated"],
         )
@@ -121,10 +164,15 @@ async def handle_manual_image(message: Message) -> None:
     settings = get_settings()
     post_id, mode = await get_active_post(settings.database_path, message.from_user.id)
 
-    if mode != "edit_image" or post_id is None:
+    if mode not in SUPPORTED_MODES or post_id is None:
         return
 
     if await reject_message_if_not_allowed(message):
+        return
+
+    # Editar imagem de publicação já no ar é owner-only (o modo só é setado pelo
+    # botão owner-only da notificação, mas reforçamos por segurança).
+    if mode == "edit_published_image" and not is_owner_id(message.from_user.id):
         return
 
     image_ref = message.photo[-1].file_id
@@ -132,11 +180,12 @@ async def handle_manual_image(message: Message) -> None:
 
     # Foto única (sem álbum): aplica na hora.
     if not group_id:
-        await _apply_images(
+        await _dispatch_apply(
             bot=message.bot,
             chat_id=message.chat.id,
             user_id=message.from_user.id,
             post_id=post_id,
+            mode=mode,
             refs=[image_ref],
             truncated=False,
         )
@@ -151,6 +200,7 @@ async def handle_manual_image(message: Message) -> None:
             "chat_id": message.chat.id,
             "user_id": message.from_user.id,
             "post_id": post_id,
+            "mode": mode,
             "refs": [],
             "truncated": False,
             "task": None,

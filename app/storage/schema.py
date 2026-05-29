@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS posts (
     image_url TEXT,
     image_urls TEXT,
     status TEXT NOT NULL DEFAULT 'draft',
+    published_chat_id INTEGER,
+    published_message_ids TEXT,
+    published_photo_message_ids TEXT,
+    published_text_message_id INTEGER,
+    published_caption_on_photo INTEGER NOT NULL DEFAULT 0,
+    published_by INTEGER,
+    published_by_name TEXT,
+    published_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(article_id) REFERENCES articles(id)
 );

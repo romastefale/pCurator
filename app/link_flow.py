@@ -14,7 +14,7 @@ from app.settings import get_settings
 from app.storage.items import find_duplicate_item, save_item
 from app.storage.posts import save_post
 from app.services.review_delivery import generate_and_deliver_review
-from app.storage.session import set_active_post
+from app.storage.session import get_active_post, set_active_post
 from app.types import ArticleIntake
 from app.ui import duplicate_keyboard
 
@@ -23,8 +23,24 @@ router = Router()
 URL_PATTERN = r"https?://\S+"
 URL_RE = re.compile(URL_PATTERN, re.IGNORECASE)
 
+# Modos em que uma mensagem de texto é conteúdo de EDIÇÃO (rascunho ou
+# publicação no ar), não um novo link pra intake.
+_EDIT_TEXT_MODES = {"edit_text", "edit_published_text"}
 
-@router.message(F.text.regexp(URL_PATTERN))
+
+async def _not_editing_text(message: Message) -> bool:
+    """Cede a vez ao fluxo de edição: como o handler que casa consome o evento
+    (aiogram não cai pro próximo router por return), o intake de link precisa
+    NÃO casar quando o usuário está no meio de uma edição de texto. Aí a
+    propagação segue até edit_flow, que aplica o novo texto (mesmo com URL)."""
+    if not message.from_user:
+        return True
+    settings = get_settings()
+    _post_id, mode = await get_active_post(settings.database_path, message.from_user.id)
+    return mode not in _EDIT_TEXT_MODES
+
+
+@router.message(F.text.regexp(URL_PATTERN), _not_editing_text)
 async def handle_possible_link(message: Message) -> None:
     match = URL_RE.search(message.text or "")
     if not match:

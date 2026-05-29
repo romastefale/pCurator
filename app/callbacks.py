@@ -21,11 +21,13 @@ from app.settings import Settings, get_settings
 from app.storage.articles import get_article
 from app.storage.authorized_users import list_authorized_users, revoke_authorized_user
 from app.storage.channels import get_channel, list_channels
+from app.published import notify_owner_published
 from app.storage.discovery_stats import get_today_count
 from app.storage.events import log_event
 from app.storage.posts import (
     get_post,
     save_post,
+    set_post_published,
     try_lock_post_for_publish,
     update_post_status,
 )
@@ -442,7 +444,7 @@ async def review_confirm(callback: CallbackQuery) -> None:
         return
 
     try:
-        await publish_post(callback.bot, channel_id, post)
+        publish_result = await publish_post(callback.bot, channel_id, post)
     except Exception as exc:
         logger.exception("Publish failed for post %s: %s", post_id, type(exc).__name__)
         # Deixa como 'failed' (não volta pra draft) — o envio pode ter saído parcial
@@ -463,7 +465,17 @@ async def review_confirm(callback: CallbackQuery) -> None:
         )
         return
 
-    await update_post_status(settings.database_path, post_id, "published")
+    await set_post_published(
+        settings.database_path,
+        post_id,
+        chat_id=channel_id,
+        message_ids=publish_result.message_ids,
+        photo_message_ids=publish_result.photo_message_ids,
+        text_message_id=publish_result.text_message_id,
+        caption_on_photo=publish_result.caption_on_photo,
+        published_by=callback.from_user.id,
+        published_by_name=callback.from_user.full_name,
+    )
     await set_active_post(
         settings.database_path,
         user_id=callback.from_user.id,
@@ -476,6 +488,19 @@ async def review_confirm(callback: CallbackQuery) -> None:
         f"✅ Post #{post_id} publicado em {safe_label}.\n"
         "Envie o próximo link quando quiser."
     )
+
+    # Notifica o dono na DM (toda publicação, própria ou de co-autor): cópia +
+    # metadados + botões editar/apagar. Não quebra o fluxo se falhar.
+    published_post = await get_post(settings.database_path, post_id)
+    if published_post:
+        await notify_owner_published(
+            callback.bot,
+            settings,
+            post=published_post,
+            channel_title=channel_title,
+            by_id=callback.from_user.id,
+            by_name=callback.from_user.full_name,
+        )
 
 
 @router.callback_query(F.data == "post:cancel_confirm")

@@ -24,6 +24,24 @@ async def apply_migrations(database_path: str) -> None:
         post_columns = await _columns(db, "posts")
         if "image_urls" not in post_columns:
             await db.execute("ALTER TABLE posts ADD COLUMN image_urls TEXT")
+        if "published_chat_id" not in post_columns:
+            await db.execute("ALTER TABLE posts ADD COLUMN published_chat_id INTEGER")
+        if "published_message_ids" not in post_columns:
+            await db.execute("ALTER TABLE posts ADD COLUMN published_message_ids TEXT")
+        if "published_photo_message_ids" not in post_columns:
+            await db.execute("ALTER TABLE posts ADD COLUMN published_photo_message_ids TEXT")
+        if "published_text_message_id" not in post_columns:
+            await db.execute("ALTER TABLE posts ADD COLUMN published_text_message_id INTEGER")
+        if "published_caption_on_photo" not in post_columns:
+            await db.execute(
+                "ALTER TABLE posts ADD COLUMN published_caption_on_photo INTEGER NOT NULL DEFAULT 0"
+            )
+        if "published_by" not in post_columns:
+            await db.execute("ALTER TABLE posts ADD COLUMN published_by INTEGER")
+        if "published_by_name" not in post_columns:
+            await db.execute("ALTER TABLE posts ADD COLUMN published_by_name TEXT")
+        if "published_at" not in post_columns:
+            await db.execute("ALTER TABLE posts ADD COLUMN published_at TEXT")
 
         session_columns = await _columns(db, "editorial_sessions")
         if "active_channel_slug" not in session_columns:

@@ -86,6 +86,77 @@ async def update_post_images(database_path: str, post_id: int, image_refs: list[
         await db.commit()
 
 
+def _parse_int_list(raw: str | None) -> list[int]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[int] = []
+    for x in data:
+        try:
+            out.append(int(x))
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
+def published_message_ids(post: dict) -> list[int]:
+    """Todos os message_ids da publicação no canal (pra apagar)."""
+    return _parse_int_list(post.get("published_message_ids"))
+
+
+def published_photo_ids(post: dict) -> list[int]:
+    """Só os message_ids das fotos no canal, na ordem (pra trocar imagem)."""
+    return _parse_int_list(post.get("published_photo_message_ids"))
+
+
+async def set_post_published(
+    database_path: str,
+    post_id: int,
+    *,
+    chat_id: int,
+    message_ids: list[int],
+    photo_message_ids: list[int],
+    text_message_id: int | None,
+    caption_on_photo: bool,
+    published_by: int | None,
+    published_by_name: str | None,
+) -> None:
+    """Marca o post como publicado e grava onde foi parar no canal, pra permitir
+    editar/apagar depois (status -> 'published', + published_at)."""
+    async with aiosqlite.connect(database_path) as db:
+        await db.execute(
+            """
+            UPDATE posts SET
+                status = 'published',
+                published_chat_id = ?,
+                published_message_ids = ?,
+                published_photo_message_ids = ?,
+                published_text_message_id = ?,
+                published_caption_on_photo = ?,
+                published_by = ?,
+                published_by_name = ?,
+                published_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                chat_id,
+                json.dumps(message_ids),
+                json.dumps(photo_message_ids),
+                text_message_id,
+                1 if caption_on_photo else 0,
+                published_by,
+                published_by_name,
+                post_id,
+            ),
+        )
+        await db.commit()
+
+
 async def update_post_status(database_path: str, post_id: int, status: str) -> None:
     async with aiosqlite.connect(database_path) as db:
         await db.execute(

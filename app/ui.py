@@ -132,6 +132,64 @@ def destination_keyboard(channels: list[dict]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def published_actions_keyboard(post_id: int) -> InlineKeyboardMarkup:
+    """Botões da notificação de publicação (DM do dono): apagar ou editar a
+    publicação já no ar. Owner-only nos handlers."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Apagar",
+                    callback_data=f"pub:del:{post_id}",
+                    style=ButtonStyle.DANGER,
+                ),
+                InlineKeyboardButton(text="✏️ Editar", callback_data=f"pub:edit:{post_id}"),
+            ]
+        ]
+    )
+
+
+def published_delete_confirm_keyboard(post_id: int) -> InlineKeyboardMarkup:
+    """Confirmação de apagar (apagar publicação é destrutivo e irreversível)."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Confirmar",
+                    callback_data=f"pub:delok:{post_id}",
+                    style=ButtonStyle.DANGER,
+                ),
+                InlineKeyboardButton(text="↩️ Voltar", callback_data=f"pub:delno:{post_id}"),
+            ]
+        ]
+    )
+
+
+def published_edit_menu_keyboard(post_id: int, has_images: bool) -> InlineKeyboardMarkup:
+    """Escolha do que editar na publicação: texto sempre; imagem só se houver."""
+    first_row = [
+        InlineKeyboardButton(
+            text="✏️ Texto",
+            callback_data=f"pubedit:text:{post_id}",
+            style=ButtonStyle.PRIMARY,
+        )
+    ]
+    if has_images:
+        first_row.append(
+            InlineKeyboardButton(
+                text="🖼 Imagem",
+                callback_data=f"pubedit:img:{post_id}",
+                style=ButtonStyle.PRIMARY,
+            )
+        )
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            first_row,
+            [InlineKeyboardButton(text="↩️ Voltar", callback_data=f"pubedit:back:{post_id}")],
+        ]
+    )
+
+
 def duplicate_keyboard(article_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
