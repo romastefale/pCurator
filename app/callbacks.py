@@ -595,7 +595,11 @@ async def review_image(callback: CallbackQuery) -> None:
             callback.bot, callback.message.chat.id, callback.from_user.id
         )
         await set_active_post(settings.database_path, user_id=callback.from_user.id, post_id=post_id, mode="edit_image")
-        await callback.message.answer(f"🖼 Envie a nova imagem para o post #{post_id}.")
+        await callback.message.answer(
+            f"🖼 Envie a nova imagem para o post #{post_id}.\n"
+            "Pode mandar de 1 a 4 fotos juntas (selecione várias e envie) — "
+            "elas viram um álbum único com a legenda do post."
+        )
 
 
 async def _deliver_next_manual_draft(

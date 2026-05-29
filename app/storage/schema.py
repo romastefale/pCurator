@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS posts (
     channel_slug TEXT NOT NULL,
     caption_html TEXT NOT NULL,
     image_url TEXT,
+    image_urls TEXT,
     status TEXT NOT NULL DEFAULT 'draft',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(article_id) REFERENCES articles(id)

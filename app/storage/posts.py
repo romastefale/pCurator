@@ -1,4 +1,25 @@
+import json
+
 import aiosqlite
+
+
+def post_image_refs(post: dict) -> list[str]:
+    """Lista de file_ids/URLs de imagem do post (1 a 4).
+
+    Prefere a coluna `image_urls` (JSON). Cai pra `image_url` (legado de 1 foto)
+    se a lista estiver vazia/ausente. Retorna [] se não houver imagem."""
+    raw = post.get("image_urls")
+    if raw:
+        try:
+            refs = json.loads(raw)
+            if isinstance(refs, list):
+                cleaned = [r for r in refs if r]
+                if cleaned:
+                    return cleaned
+        except (json.JSONDecodeError, TypeError):
+            pass
+    single = post.get("image_url")
+    return [single] if single else []
 
 
 async def save_post(
@@ -42,10 +63,25 @@ async def update_post_caption(database_path: str, post_id: int, caption_html: st
 
 
 async def update_post_image(database_path: str, post_id: int, image_url: str | None) -> None:
+    """Define uma única imagem (limpa a lista de álbum)."""
+    image_urls = json.dumps([image_url]) if image_url else None
     async with aiosqlite.connect(database_path) as db:
         await db.execute(
-            "UPDATE posts SET image_url = ? WHERE id = ?",
-            (image_url, post_id),
+            "UPDATE posts SET image_url = ?, image_urls = ? WHERE id = ?",
+            (image_url, image_urls, post_id),
+        )
+        await db.commit()
+
+
+async def update_post_images(database_path: str, post_id: int, image_refs: list[str]) -> None:
+    """Define de 1 a 4 imagens (álbum). `image_url` guarda a primeira (legado)."""
+    image_refs = [r for r in image_refs if r][:4]
+    first = image_refs[0] if image_refs else None
+    image_urls = json.dumps(image_refs) if image_refs else None
+    async with aiosqlite.connect(database_path) as db:
+        await db.execute(
+            "UPDATE posts SET image_url = ?, image_urls = ? WHERE id = ?",
+            (first, image_urls, post_id),
         )
         await db.commit()
 
