@@ -1,7 +1,7 @@
 import html
 
 from aiogram import Router
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import Message
 
@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from app.access import reject_message_if_not_allowed, reject_message_if_not_owner
 from app.storage.authorized_users import add_authorized_user, list_authorized_users
-from app.storage.channels import list_channels
+from app.storage.channels import get_channel, list_channels, set_channel_enabled
 from app.services.discovery_scheduler import (
     GNEWS_DAILY_BUDGET,
     auto_cycles_remaining_today,
@@ -78,7 +78,8 @@ async def help_command(message: Message) -> None:
         "/pfr ID — reabrir post 'failed' como rascunho\n"
         "/buscar — pedir uma notícia agora (escolhe a trilha, gera a prévia, botão ⏭ Próxima para descartar e pedir outra)\n\n"
         "<b>Canais</b>\n"
-        "/pc — listar canais detectados (o bot aparece aqui ao virar admin de um canal)\n\n"
+        "/pc — listar canais detectados (o bot aparece aqui ao virar admin de um canal)\n"
+        "/adeus ID — sair de um canal pelo ID (só o dono)\n\n"
         "<b>Equipe (só o dono)</b>\n"
         "/pe — listar co-autores e revogar acesso\n"
         "/pea ID Nome — autorizar um co-autor pelo ID do Telegram\n\n"
@@ -149,14 +150,73 @@ async def channels_command(message: Message) -> None:
         return
 
     lines = "\n".join(
-        f"• {html.escape(c['title'])}"
+        f"• <code>{c['chat_id']}</code> — {html.escape(c['title'])}"
         + (f" (@{html.escape(c['username'])})" if c.get("username") else "")
         for c in channels
     )
     await message.answer(
         "<b>Canais disponíveis para publicar</b>\n\n"
         f"{lines}\n\n"
+        "Use <code>/adeus ID</code> para fazer o bot sair de um canal.\n"
         "Promova o bot a administrador em outros canais para que apareçam aqui."
+    )
+
+
+@router.message(Command("adeus"))
+async def leave_channel_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    parts = (message.text or "").split()
+    if len(parts) < 2:
+        await message.answer(
+            "Uso: <code>/adeus ID</code>\n"
+            "Ex.: <code>/adeus -1001234567890</code>\n\n"
+            "Veja os IDs disponíveis em /pc."
+        )
+        return
+
+    try:
+        chat_id = int(parts[1])
+    except ValueError:
+        await message.answer(
+            "ID inválido — informe o número do canal, como <code>-1001234567890</code>."
+        )
+        return
+
+    settings = get_settings()
+    channel = await get_channel(settings.database_path, chat_id)
+
+    try:
+        await message.bot.send_message(chat_id=chat_id, text="pCurator off")
+    except TelegramAPIError as exc:
+        await message.answer(
+            "❌ Não consegui postar o aviso <code>pCurator off</code> nesse canal.\n"
+            "O bot não saiu do canal.\n"
+            f"ID: <code>{chat_id}</code>\n"
+            f"Erro do Telegram: <code>{html.escape(str(exc))}</code>"
+        )
+        return
+
+    try:
+        await message.bot.leave_chat(chat_id)
+    except TelegramAPIError as exc:
+        await message.answer(
+            "❌ Publiquei <code>pCurator off</code>, mas não consegui sair desse canal.\n"
+            f"ID: <code>{chat_id}</code>\n"
+            f"Erro do Telegram: <code>{html.escape(str(exc))}</code>"
+        )
+        return
+
+    await set_channel_enabled(settings.database_path, chat_id, False)
+
+    title = channel.get("title") if channel else None
+    title_line = f"Canal: {html.escape(title)}\n" if title else ""
+    await message.answer(
+        "👋 Bot saiu do canal com sucesso.\n"
+        f"{title_line}"
+        f"ID: <code>{chat_id}</code>\n\n"
+        "O canal também foi desativado na lista local."
     )
 
 
