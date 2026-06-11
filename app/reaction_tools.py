@@ -217,13 +217,13 @@ async def reaction_probe_command(message: Message) -> None:
     try:
         chat = await message.bot.get_chat(f"@{channel}")
         chat_id = chat.id
-        title = html.escape(chat.title or chat.full_name or f"@{channel}")
+        title = html.escape(chat.title or getattr(chat, "full_name", None) or f"@{channel}")
         attempt_lines.append(f"getChat: ok — {title} · <code>{chat.id}</code>")
 
         bot_user = await message.bot.get_me()
         try:
             member = await message.bot.get_chat_member(chat.id, bot_user.id)
-            attempt_lines.append(f"bot no canal: <code>{html.escape(member.status)}</code>")
+            attempt_lines.append(f"bot no canal: <code>{html.escape(str(member.status))}</code>")
         except TelegramAPIError as exc:
             attempt_lines.append(
                 "bot no canal: não confirmado — "
