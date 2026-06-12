@@ -49,13 +49,15 @@ async def run_polling() -> None:
     )
     await _seed_channels(bot, settings)
     dispatcher = create_dispatcher()
+    allowed_updates = dispatcher.resolve_used_update_types()
+    logger.info("allowed_updates=%s", allowed_updates)
 
     discovery_task = asyncio.create_task(
         discovery_loop(bot, settings), name="discovery_loop"
     )
 
     try:
-        await dispatcher.start_polling(bot)
+        await dispatcher.start_polling(bot, allowed_updates=allowed_updates)
     finally:
         discovery_task.cancel()
         try:

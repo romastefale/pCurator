@@ -28,6 +28,7 @@ from aiogram.types import CallbackQuery, InputMediaPhoto, LinkPreviewOptions
 from app.access import is_owner_id, reject_callback_if_not_owner
 from app.services.preview import send_post_preview
 from app.settings import Settings, get_settings
+from app.storage.channels import get_channel
 from app.storage.events import log_event
 from app.storage.posts import (
     get_post,
@@ -38,6 +39,7 @@ from app.storage.posts import (
     update_post_images,
     update_post_status,
 )
+from app.storage.reactions import upsert_reaction_watch
 from app.storage.session import set_active_post
 from app.ui import (
     published_actions_keyboard,
@@ -58,6 +60,48 @@ def _format_when(settings: Settings) -> str:
         return datetime.now().strftime("%d/%m/%Y %H:%M")
 
 
+async def _auto_watch_published_messages(
+    settings: Settings,
+    *,
+    post: dict,
+    channel_title: str | None,
+) -> None:
+    """Coloca publicações novas em observação de reações futuras.
+
+    Não interfere na publicação nem na notificação ao dono: qualquer falha fica
+    só no log. Para álbum, observa cada message_id publicado, porque o Telegram
+    pode entregar reação/contagem por mensagem individual.
+    """
+    try:
+        chat_id = post.get("published_chat_id")
+        message_ids = published_message_ids(post)
+        if not chat_id or not message_ids:
+            return
+
+        channel = await get_channel(settings.database_path, chat_id)
+        username = (channel or {}).get("username")
+        title = channel_title or (channel or {}).get("title")
+
+        for message_id in message_ids:
+            if username:
+                post_link = f"https://t.me/{username}/{message_id}"
+            else:
+                post_link = f"channel:{chat_id}/{message_id}"
+            await upsert_reaction_watch(
+                settings.database_path,
+                chat_id=chat_id,
+                message_id=message_id,
+                channel_username=username,
+                channel_title=title,
+                post_link=post_link,
+                created_by=post.get("published_by"),
+                source="auto_publish",
+            )
+        logger.info("reaction_auto_watch post=%s messages=%s", post.get("id"), message_ids)
+    except Exception:
+        logger.exception("reaction_auto_watch_failed post=%s", post.get("id"))
+
+
 async def notify_owner_published(
     bot,
     settings: Settings,
@@ -70,6 +114,8 @@ async def notify_owner_published(
     """Manda pro dono a cópia da publicação + metadados + botões. Nunca quebra
     o fluxo de publicação: erros são logados, não propagados."""
     try:
+        await _auto_watch_published_messages(settings, post=post, channel_title=channel_title)
+
         owner_id = settings.owner_id
         post_id = post["id"]
 

@@ -65,4 +65,54 @@ async def apply_migrations(database_path: str) -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_channels_chat_id ON channels(chat_id)"
         )
 
+
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS reaction_watches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                channel_username TEXT,
+                channel_title TEXT,
+                post_link TEXT NOT NULL,
+                created_by INTEGER,
+                source TEXT NOT NULL DEFAULT 'manual',
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_event_at TEXT,
+                UNIQUE(chat_id, message_id)
+            )
+            """
+        )
+        reaction_watch_columns = await _columns(db, "reaction_watches")
+        if "source" not in reaction_watch_columns:
+            await db.execute(
+                "ALTER TABLE reaction_watches ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'"
+            )
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS reaction_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                actor_user_id INTEGER,
+                actor_username TEXT,
+                actor_name TEXT,
+                actor_chat_id INTEGER,
+                actor_chat_title TEXT,
+                old_reaction_json TEXT,
+                new_reaction_json TEXT,
+                reactions_json TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reaction_watches_post ON reaction_watches(chat_id, message_id)"
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reaction_events_post ON reaction_events(chat_id, message_id, id)"
+        )
+
         await db.commit()
