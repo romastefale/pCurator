@@ -15,6 +15,8 @@ from app.access import is_owner_id
 from app.settings import get_settings
 from app.storage.reactions import (
     deactivate_reaction_watch,
+    find_reaction_posts_by_message_id,
+    get_latest_reaction_post_metadata,
     get_reaction_watch,
     latest_reaction_snapshots,
     list_recent_reaction_snapshots,
@@ -22,6 +24,7 @@ from app.storage.reactions import (
     list_reaction_watches,
     reaction_event_count,
     record_reaction_event,
+    record_reaction_post_metadata,
     record_reaction_snapshot,
     upsert_reaction_watch,
 )
@@ -971,6 +974,260 @@ def _latest_post_totals(rows: list[dict[str, Any]]) -> dict[tuple[int, int], dic
     return posts
 
 
+
+
+def _extract_json_candidate(text: str) -> str:
+    candidate = (text or "").strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```(?:json)?\s*", "", candidate, flags=re.IGNORECASE).strip()
+        candidate = re.sub(r"\s*```$", "", candidate).strip()
+    first_brace = min([idx for idx in [candidate.find("{"), candidate.find("[")] if idx >= 0] or [-1])
+    if first_brace > 0:
+        candidate = candidate[first_brace:]
+    return candidate
+
+
+def _nested_get(data: Any, path: list[Any], default: Any = None) -> Any:
+    current = data
+    for key in path:
+        try:
+            if isinstance(current, dict):
+                current = current[key]
+            elif isinstance(current, list) and isinstance(key, int):
+                current = current[key]
+            else:
+                return default
+        except (KeyError, IndexError, TypeError):
+            return default
+    return current
+
+
+def _short_text(value: Any, limit: int = 180) -> str | None:
+    if value is None:
+        return None
+    text = str(value).replace("\n", " ").replace("\r", " ").strip()
+    if not text:
+        return None
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _chat_id_from_dump_peer(raw_id: Any) -> int | None:
+    peer_id = _safe_int(raw_id)
+    if peer_id is None:
+        return None
+    if peer_id < 0:
+        return peer_id
+    return int(f"-100{peer_id}")
+
+
+def _dump_attributes(data: dict[str, Any]) -> list[dict[str, Any]]:
+    attrs = data.get("attributes")
+    return attrs if isinstance(attrs, list) else []
+
+
+def _dump_reaction_attribute(data: dict[str, Any]) -> dict[str, Any] | None:
+    for attr in _dump_attributes(data):
+        if isinstance(attr, dict) and isinstance(attr.get("reactions"), list):
+            return attr
+    return None
+
+
+def _dump_signature(data: dict[str, Any]) -> str | None:
+    for attr in _dump_attributes(data):
+        if isinstance(attr, dict) and attr.get("signature"):
+            return _short_text(attr.get("signature"), 80)
+    return None
+
+
+def _dump_count_values(data: dict[str, Any]) -> list[int]:
+    values: list[int] = []
+    for attr in _dump_attributes(data):
+        if isinstance(attr, dict) and "count" in attr:
+            number = _safe_int(attr.get("count"))
+            if number is not None:
+                values.append(number)
+    return values
+
+
+def _dump_content_type(data: dict[str, Any]) -> str:
+    media = data.get("media")
+    if isinstance(media, list) and media:
+        for item in media:
+            if isinstance(item, dict) and ("imageId" in item or "representations" in item):
+                return "photo"
+        return "media"
+    if data.get("text"):
+        return "text"
+    return "unknown"
+
+
+def _dump_reaction_value(value: Any) -> tuple[str, str, str]:
+    if isinstance(value, dict):
+        if value.get("builtin"):
+            label = str(value["builtin"])
+            return f"emoji:{label}", label, "emoji"
+        if value.get("customEmojiId") or value.get("custom_emoji_id"):
+            custom_id = str(value.get("customEmojiId") or value.get("custom_emoji_id"))
+            return f"custom_emoji:{custom_id}", f"custom:{custom_id}", "custom_emoji"
+        if value.get("paid") or value.get("stars"):
+            return "paid", "paid", "paid"
+    label = str(value or "unknown")
+    return label, label, "unknown"
+
+
+def _dump_reaction_items(data: dict[str, Any]) -> list[dict[str, Any]]:
+    attr = _dump_reaction_attribute(data)
+    if not attr:
+        return []
+    items: list[dict[str, Any]] = []
+    for raw in attr.get("reactions") or []:
+        if not isinstance(raw, dict):
+            continue
+        key, label, kind = _dump_reaction_value(raw.get("value"))
+        total = _safe_int(raw.get("count")) or 0
+        chosen_order = _safe_int(raw.get("chosenOrder"))
+        items.append({"key": key, "label": label, "kind": kind, "total": total, "chosen_order": chosen_order})
+    return items
+
+
+def _parse_dump_payload(text: str) -> dict[str, Any]:
+    data = json.loads(_extract_json_candidate(text))
+    if isinstance(data, list):
+        if len(data) != 1 or not isinstance(data[0], dict):
+            raise ValueError("dump precisa ser um objeto JSON de mensagem ou lista com um objeto")
+        data = data[0]
+    if not isinstance(data, dict):
+        raise ValueError("dump precisa ser um objeto JSON")
+
+    peer_raw = _nested_get(data, ["id", "peerId", "id", "rawValue"])
+    if peer_raw is None:
+        peer_raw = _nested_get(data, ["author", "id", "id", "rawValue"])
+    chat_id = _chat_id_from_dump_peer(peer_raw)
+    message_id = _safe_int(_nested_get(data, ["id", "id"])) or _safe_int(data.get("stableId"))
+    username = _nested_get(data, ["author", "username"])
+    title = _nested_get(data, ["author", "title"])
+
+    if not username or not title:
+        for peer in _nested_get(data, ["peers", "items"], []) or []:
+            if not isinstance(peer, dict):
+                continue
+            candidate = peer.get(".1")
+            if isinstance(candidate, dict):
+                username = username or candidate.get("username")
+                title = title or candidate.get("title")
+                break
+
+    items = _dump_reaction_items(data)
+    stats = _reaction_stats_from_items(items)
+    reaction_label = " · ".join(f"{item['label']}: {item['total']}" for item in items) or "—"
+    reaction_attr = _dump_reaction_attribute(data) or {}
+    can_view_list = reaction_attr.get("canViewList")
+    recent_peers = reaction_attr.get("recentPeers") if isinstance(reaction_attr.get("recentPeers"), list) else []
+    top_peers = reaction_attr.get("topPeers") if isinstance(reaction_attr.get("topPeers"), list) else []
+    paid_reactors = reaction_attr.get("paidReactors") if isinstance(reaction_attr.get("paidReactors"), list) else []
+    are_tags = reaction_attr.get("isTags")
+    data_mode = "list_available" if bool(can_view_list) else "aggregate_anonymous"
+    post_link = f"https://t.me/{username}/{message_id}" if username and message_id else None
+
+    if chat_id is None or message_id is None:
+        raise ValueError("não consegui extrair chat_id/message_id do dump")
+
+    return {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "chat_username": str(username) if username else None,
+        "chat_title": str(title) if title else None,
+        "post_link": post_link or f"channel:{chat_id}/{message_id}",
+        "text_preview": _short_text(data.get("text"), 180),
+        "signature": _dump_signature(data),
+        "content_type": _dump_content_type(data),
+        "can_view_list": None if can_view_list is None else bool(can_view_list),
+        "recent_peers_count": len(recent_peers),
+        "top_peers_count": len(top_peers),
+        "paid_reactors_count": len(paid_reactors),
+        "are_tags": None if are_tags is None else bool(are_tags),
+        "reaction_items": items,
+        "reaction_label": reaction_label,
+        "total_reactions": int(stats["total_reactions"]),
+        "reaction_kinds": int(stats["reaction_kinds"]),
+        "dominant_reaction": str(stats["dominant_reaction"]),
+        "data_mode": data_mode,
+        "raw_count_values": _dump_count_values(data),
+        "stable_id": data.get("stableId"),
+        "stable_version": data.get("stableVersion"),
+    }
+
+
+def _metadata_bool_label(value: Any) -> str:
+    if value is None:
+        return "—"
+    return "sim" if bool(value) else "não"
+
+
+def _format_metadata_block(metadata: dict[str, Any] | None) -> str:
+    if not metadata:
+        return "<b>Metadados deep salvos</b>\n— nenhum dump salvo para este post ainda"
+    return (
+        "<b>Metadados deep salvos</b>\n"
+        f"texto: <code>{html.escape(str(metadata.get('text_preview') or '—'))}</code>\n"
+        f"assinatura: <code>{html.escape(str(metadata.get('signature') or '—'))}</code>\n"
+        f"tipo: <code>{html.escape(str(metadata.get('content_type') or '—'))}</code>\n"
+        f"canViewList: <code>{_metadata_bool_label(metadata.get('dump_can_view_list'))}</code> · "
+        f"recentPeers: <code>{metadata.get('dump_recent_peers_count') or 0}</code> · "
+        f"topPeers: <code>{metadata.get('dump_top_peers_count') or 0}</code>\n"
+        f"modo dump: <code>{html.escape(str(metadata.get('dump_data_mode') or '—'))}</code> · "
+        f"último deep: <code>{html.escape(str(metadata.get('created_at') or '—'))}</code>"
+    )
+
+
+def _format_deep_result(analysis: dict[str, Any], *, saved_snapshot_lines: list[str] | None = None, db_block: str | None = None) -> str:
+    saved_snapshot_lines = saved_snapshot_lines or []
+    title = html.escape(str(analysis.get("chat_title") or analysis["chat_id"]))
+    username = analysis.get("chat_username")
+    username_line = f"@{html.escape(str(username))}" if username else "—"
+    text_preview = html.escape(str(analysis.get("text_preview") or "—"))
+    signature = html.escape(str(analysis.get("signature") or "—"))
+    content_type = html.escape(str(analysis.get("content_type") or "—"))
+    post_link = html.escape(str(analysis.get("post_link") or "—"))
+    reactions = html.escape(str(analysis.get("reaction_label") or "—"))
+    can_view = _metadata_bool_label(analysis.get("can_view_list"))
+    are_tags = _metadata_bool_label(analysis.get("are_tags"))
+    snapshot_text = "\n".join(saved_snapshot_lines) if saved_snapshot_lines else "—"
+    db_text = ("\n\n" + db_block) if db_block else ""
+    return (
+        "<b>Diagnóstico deep de reações</b>\n\n"
+        f"Canal: <b>{title}</b> · <code>{username_line}</code>\n"
+        f"Chat ID: <code>{analysis['chat_id']}</code>\n"
+        f"Post: <code>{analysis['message_id']}</code>\n"
+        f"Link: <code>{post_link}</code>\n\n"
+        f"Texto: <code>{text_preview}</code>\n"
+        f"Assinatura: <code>{signature}</code>\n"
+        f"Tipo: <code>{content_type}</code>\n\n"
+        f"Reações dump/API: <code>{reactions}</code>\n"
+        f"Total: <code>{analysis.get('total_reactions', 0)}</code> · "
+        f"tipos: <code>{analysis.get('reaction_kinds', 0)}</code> · "
+        f"dominante: <code>{html.escape(str(analysis.get('dominant_reaction') or '—'))}</code>\n\n"
+        "<b>Camada dump/API</b>\n"
+        f"canViewList: <code>{can_view}</code>\n"
+        f"recentPeers: <code>{analysis.get('recent_peers_count', 0)}</code> · "
+        f"topPeers: <code>{analysis.get('top_peers_count', 0)}</code> · "
+        f"paidReactors: <code>{analysis.get('paid_reactors_count', 0)}</code>\n"
+        f"isTags: <code>{are_tags}</code>\n"
+        f"modo: <code>{html.escape(str(analysis.get('data_mode') or '—'))}</code>\n\n"
+        "<b>Snapshots gravados a partir do dump</b>\n"
+        f"{snapshot_text}"
+        f"{db_text}\n\n"
+        "<b>Campos ignorados por segurança</b>\n"
+        "<code>accessHash</code>, <code>fileReference</code>, <code>pointerValue</code>, bytes de thumbnail e IDs internos de mídia."
+    )
+
 @router.message(Command("preactpost"))
 async def reaction_post_stats_command(message: Message) -> None:
     """Mostra diagnóstico estatístico de um post observado."""
@@ -1117,6 +1374,164 @@ async def reaction_csv_command(message: Message) -> None:
     if len(csv_text) > 3500:
         csv_text = csv_text[:3500] + "\n...cortado para caber na mensagem"
     await message.answer("<b>CSV de snapshots recentes</b>\n\n<pre>" + html.escape(csv_text) + "</pre>")
+
+
+@router.message(Command("preactdeep"))
+async def reaction_deep_command(message: Message) -> None:
+    """Diagnóstico profundo: link/id por banco ou dump JSON por reply/texto."""
+    if await _ignore_if_not_owner_dm(message):
+        return
+
+    payload = _command_payload(message.text or "")
+    reply_text = None
+    if message.reply_to_message:
+        reply_text = message.reply_to_message.text or message.reply_to_message.caption
+
+    dump_text = None
+    if reply_text and (not payload or payload.lower() in {"dump", "json"}):
+        dump_text = reply_text
+    elif payload.strip().startswith(("{", "[", "```")):
+        dump_text = payload
+
+    settings = get_settings()
+    if dump_text:
+        try:
+            analysis = _parse_dump_payload(dump_text)
+        except Exception as exc:
+            await message.answer(
+                "<b>Diagnóstico deep</b>\n\n"
+                f"Não consegui parametrizar o dump JSON: <code>{html.escape(str(exc))}</code>\n\n"
+                "Use reply no dump completo e envie <code>/preactdeep</code>."
+            )
+            return
+
+        await upsert_reaction_watch(
+            settings.database_path,
+            chat_id=int(analysis["chat_id"]),
+            message_id=int(analysis["message_id"]),
+            channel_username=analysis.get("chat_username"),
+            channel_title=analysis.get("chat_title"),
+            post_link=str(analysis.get("post_link") or f"channel:{analysis['chat_id']}/{analysis['message_id']}"),
+            created_by=message.from_user.id if message.from_user else None,
+            source="dump_deep",
+        )
+        metadata = await record_reaction_post_metadata(
+            settings.database_path,
+            chat_id=int(analysis["chat_id"]),
+            message_id=int(analysis["message_id"]),
+            channel_username=analysis.get("chat_username"),
+            channel_title=analysis.get("chat_title"),
+            post_link=analysis.get("post_link"),
+            text_preview=analysis.get("text_preview"),
+            signature=analysis.get("signature"),
+            content_type=analysis.get("content_type"),
+            dump_can_view_list=analysis.get("can_view_list"),
+            dump_recent_peers_count=int(analysis.get("recent_peers_count") or 0),
+            dump_top_peers_count=int(analysis.get("top_peers_count") or 0),
+            dump_paid_reactors_count=int(analysis.get("paid_reactors_count") or 0),
+            dump_are_tags=analysis.get("are_tags"),
+            dump_reactions=analysis.get("reaction_items"),
+            dump_total_reactions=int(analysis.get("total_reactions") or 0),
+            dump_reaction_kinds=int(analysis.get("reaction_kinds") or 0),
+            dump_dominant_reaction=str(analysis.get("dominant_reaction") or "—"),
+            dump_data_mode=str(analysis.get("data_mode") or "aggregate_anonymous"),
+            raw_count_values=analysis.get("raw_count_values"),
+            source="preactdeep_dump",
+        )
+
+        snapshot_lines: list[str] = []
+        for item in analysis.get("reaction_items") or []:
+            snapshot = await record_reaction_snapshot(
+                settings.database_path,
+                chat_id=int(analysis["chat_id"]),
+                message_id=int(analysis["message_id"]),
+                reaction_key=str(item["key"]),
+                reaction_type=str(item["kind"]),
+                total_count=int(item["total"]),
+                data_mode=str(analysis.get("data_mode") or "aggregate_anonymous"),
+                telegram_date=None,
+                total_reactions=int(analysis.get("total_reactions") or 0),
+                reaction_kinds=int(analysis.get("reaction_kinds") or 0),
+                dominant_reaction=str(analysis.get("dominant_reaction") or "—"),
+            )
+            snapshot_lines.append("• " + _snapshot_summary_line(snapshot))
+
+        _audit_info(
+            "preactdeep_dump_saved",
+            chat_id=analysis["chat_id"],
+            message_id=analysis["message_id"],
+            total_reactions=analysis.get("total_reactions"),
+            reaction_kinds=analysis.get("reaction_kinds"),
+            can_view_list=analysis.get("can_view_list"),
+            metadata_id=metadata.get("id"),
+        )
+        await message.answer(_format_deep_result(analysis, saved_snapshot_lines=snapshot_lines))
+        return
+
+    raw_ref = payload.strip()
+    if not raw_ref:
+        await message.answer(
+            "<b>Diagnóstico deep</b>\n\n"
+            "Uso por link: <code>/preactdeep https://t.me/romastefale/118</code>\n"
+            "Uso por ID já visto: <code>/preactdeep 118</code>\n"
+            "Uso por dump: responda ao JSON do dump com <code>/preactdeep</code>."
+        )
+        return
+
+    if raw_ref.isdigit():
+        matches = await find_reaction_posts_by_message_id(settings.database_path, int(raw_ref), limit=8)
+        if not matches:
+            await message.answer(
+                "<b>Diagnóstico deep</b>\n\n"
+                f"Não encontrei post <code>{html.escape(raw_ref)}</code> nos dados locais. Use link completo ou responda a um dump."
+            )
+            return
+        if len(matches) > 1:
+            lines = []
+            for item in matches:
+                title = html.escape(str(item.get("channel_title") or item.get("channel_username") or item["chat_id"]))
+                ref = html.escape(str(item.get("post_link") or f"channel:{item['chat_id']}/{item['message_id']}"))
+                lines.append(f"• {title} · <code>{ref}</code>")
+            await message.answer(
+                "<b>Diagnóstico deep</b>\n\n"
+                "Esse ID existe em mais de um contexto. Use uma destas refs:\n" + "\n".join(lines)
+            )
+            return
+        chat_id = int(matches[0]["chat_id"])
+        message_id = int(matches[0]["message_id"])
+        attempt_lines = [f"Post local: <code>{message_id}</code>", f"Chat ID: <code>{chat_id}</code>"]
+    else:
+        chat_id, message_id, _, _, _, attempt_lines = await _resolve_post_ref(message, raw_ref)
+        if chat_id is None or message_id is None:
+            await message.answer(
+                "<b>Diagnóstico deep</b>\n\n"
+                + "\n".join(f"• {line}" for line in attempt_lines)
+                + "\n\nNão consegui resolver o post."
+            )
+            return
+
+    watch = await get_reaction_watch(settings.database_path, chat_id, message_id)
+    snapshots = await latest_reaction_snapshots(settings.database_path, chat_id, message_id)
+    metadata = await get_latest_reaction_post_metadata(settings.database_path, chat_id, message_id)
+    snapshot_block = await _format_snapshot_probe(settings.database_path, chat_id, message_id)
+    metadata_block = _format_metadata_block(metadata)
+    title = html.escape(str((watch or {}).get("channel_title") or (metadata or {}).get("channel_title") or chat_id))
+    ref = html.escape(str((watch or {}).get("post_link") or (metadata or {}).get("post_link") or raw_ref))
+    await message.answer(
+        "<b>Diagnóstico deep de reações</b>\n\n"
+        + "\n".join(f"• {line}" for line in attempt_lines)
+        + "\n\n"
+        f"Canal: <b>{title}</b>\n"
+        f"Chat ID: <code>{chat_id}</code>\n"
+        f"Post: <code>{message_id}</code>\n"
+        f"Ref: <code>{ref}</code>\n\n"
+        + snapshot_block
+        + "\n\n"
+        + metadata_block
+        + "\n\n"
+        + ("<b>Conclusão</b>\nHá snapshots locais para este post." if snapshots else "<b>Conclusão</b>\nAinda não há snapshot local para este post.")
+    )
+
 
 @router.message(Command("preact"))
 async def reaction_probe_command(message: Message) -> None:

@@ -286,3 +286,136 @@ async def reaction_event_count(database_path: str, chat_id: int, message_id: int
         )
         row = await cursor.fetchone()
         return int(row[0] or 0)
+
+
+async def record_reaction_post_metadata(
+    database_path: str,
+    *,
+    chat_id: int,
+    message_id: int,
+    channel_username: str | None = None,
+    channel_title: str | None = None,
+    post_link: str | None = None,
+    text_preview: str | None = None,
+    signature: str | None = None,
+    content_type: str | None = None,
+    dump_can_view_list: bool | None = None,
+    dump_recent_peers_count: int | None = None,
+    dump_top_peers_count: int | None = None,
+    dump_paid_reactors_count: int | None = None,
+    dump_are_tags: bool | None = None,
+    dump_reactions: Any = None,
+    dump_total_reactions: int | None = None,
+    dump_reaction_kinds: int | None = None,
+    dump_dominant_reaction: str | None = None,
+    dump_data_mode: str | None = None,
+    raw_count_values: Any = None,
+    source: str = "dump",
+) -> dict:
+    async with aiosqlite.connect(database_path) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute(
+            """
+            INSERT INTO reaction_post_metadata (
+                chat_id, message_id, channel_username, channel_title, post_link,
+                text_preview, signature, content_type,
+                dump_can_view_list, dump_recent_peers_count, dump_top_peers_count,
+                dump_paid_reactors_count, dump_are_tags, dump_reactions_json,
+                dump_total_reactions, dump_reaction_kinds, dump_dominant_reaction,
+                dump_data_mode, raw_count_values_json, source, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (
+                chat_id,
+                message_id,
+                channel_username,
+                channel_title,
+                post_link,
+                text_preview,
+                signature,
+                content_type,
+                None if dump_can_view_list is None else int(bool(dump_can_view_list)),
+                dump_recent_peers_count,
+                dump_top_peers_count,
+                dump_paid_reactors_count,
+                None if dump_are_tags is None else int(bool(dump_are_tags)),
+                _json_dumps(dump_reactions),
+                dump_total_reactions,
+                dump_reaction_kinds,
+                dump_dominant_reaction,
+                dump_data_mode,
+                _json_dumps(raw_count_values),
+                source,
+            ),
+        )
+        await db.commit()
+        cursor = await db.execute(
+            """
+            SELECT *
+            FROM reaction_post_metadata
+            WHERE rowid = last_insert_rowid()
+            """
+        )
+        row = await cursor.fetchone()
+        return dict(row)
+
+
+async def get_latest_reaction_post_metadata(
+    database_path: str,
+    chat_id: int,
+    message_id: int,
+) -> dict | None:
+    async with aiosqlite.connect(database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT *
+            FROM reaction_post_metadata
+            WHERE chat_id = ? AND message_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (chat_id, message_id),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def find_reaction_posts_by_message_id(
+    database_path: str,
+    message_id: int,
+    limit: int = 8,
+) -> list[dict]:
+    async with aiosqlite.connect(database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT chat_id, message_id, channel_title, channel_username, post_link, source, last_event_at, created_at
+            FROM reaction_watches
+            WHERE message_id = ?
+            ORDER BY COALESCE(last_event_at, created_at) DESC, id DESC
+            LIMIT ?
+            """,
+            (message_id, limit),
+        )
+        rows = await cursor.fetchall()
+        if rows:
+            return [dict(row) for row in rows]
+
+        cursor = await db.execute(
+            """
+            SELECT s.chat_id, s.message_id, w.channel_title, w.channel_username, w.post_link,
+                   COALESCE(w.source, s.data_mode) AS source, s.captured_at AS last_event_at, s.captured_at AS created_at
+            FROM reaction_snapshots s
+            LEFT JOIN reaction_watches w
+              ON w.chat_id = s.chat_id AND w.message_id = s.message_id
+            WHERE s.message_id = ?
+            GROUP BY s.chat_id, s.message_id
+            ORDER BY MAX(s.id) DESC
+            LIMIT ?
+            """,
+            (message_id, limit),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]

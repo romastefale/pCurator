@@ -142,4 +142,36 @@ async def apply_migrations(database_path: str) -> None:
             "CREATE INDEX IF NOT EXISTS idx_reaction_events_post ON reaction_events(chat_id, message_id, id)"
         )
 
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS reaction_post_metadata (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                channel_username TEXT,
+                channel_title TEXT,
+                post_link TEXT,
+                text_preview TEXT,
+                signature TEXT,
+                content_type TEXT,
+                dump_can_view_list INTEGER,
+                dump_recent_peers_count INTEGER,
+                dump_top_peers_count INTEGER,
+                dump_paid_reactors_count INTEGER,
+                dump_are_tags INTEGER,
+                dump_reactions_json TEXT,
+                dump_total_reactions INTEGER,
+                dump_reaction_kinds INTEGER,
+                dump_dominant_reaction TEXT,
+                dump_data_mode TEXT,
+                raw_count_values_json TEXT,
+                source TEXT NOT NULL DEFAULT 'dump',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reaction_post_metadata_post ON reaction_post_metadata(chat_id, message_id, id)"
+        )
+
         await db.commit()

@@ -85,6 +85,7 @@ async def help_command(message: Message) -> None:
         "• Atualizações de reação/contagem são salvas e enviadas por DM ao dono.\n"
         "/preact LINK — consultar diagnóstico/watchlist de um post\n"
         "/preactpost LINK — ver estatística, snapshot, delta e modo do dado\n"
+        "/preactdeep LINK|ID|dump — diagnóstico profundo com snapshots e dump colado\n"
         "/preacttop — ranking dos posts com mais reações\n"
         "/preactfast — posts com maior delta recente\n"
         "/preactresumo — resumo geral por DM\n"
