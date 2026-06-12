@@ -1167,6 +1167,155 @@ def _dump_reaction_container_candidates(data: dict[str, Any]) -> list[tuple[str,
     return unique
 
 
+
+_REACTION_PROBE_KEYS = {
+    "reaction",
+    "reactions",
+    "messageReactions",
+    "message_reactions",
+    "reactionCounts",
+    "reaction_counts",
+    "results",
+    "canViewList",
+    "canGetAddedReactions",
+    "can_get_added_reactions",
+    "can_see_list",
+    "canSeeList",
+    "recentPeers",
+    "recent_peers",
+    "recentReactions",
+    "recent_reactions",
+    "recentSenderIds",
+    "recent_sender_ids",
+    "topPeers",
+    "top_peers",
+    "topReactors",
+    "top_reactors",
+    "paidReactors",
+    "paid_reactors",
+    "areTags",
+    "are_tags",
+    "isTags",
+}
+
+_REACTION_CONTAINER_KEYS = {
+    "reactions",
+    "messageReactions",
+    "message_reactions",
+    "reactionCounts",
+    "reaction_counts",
+    "results",
+}
+
+
+def _dump_path_join(base: str, key: Any) -> str:
+    if isinstance(key, int):
+        return f"{base}[{key}]" if base else f"[{key}]"
+    if not base:
+        return str(key)
+    safe = str(key)
+    if safe.isidentifier():
+        return f"{base}.{safe}"
+    return f"{base}[{safe!r}]"
+
+
+def _dump_probe_value_summary(value: Any) -> str:
+    if isinstance(value, list):
+        return f"list[{len(value)}]"
+    if isinstance(value, dict):
+        keys = list(value.keys())[:6]
+        return "dict{" + ",".join(str(k) for k in keys) + ("…" if len(value) > 6 else "") + "}"
+    if isinstance(value, bool):
+        return str(value).lower()
+    if value is None:
+        return "null"
+    text = str(value).replace("\n", " ").replace("\r", " ").strip()
+    return text[:60] + ("…" if len(text) > 60 else "")
+
+
+def _dump_probe_reaction_paths(data: Any, *, limit: int = 40) -> list[dict[str, str]]:
+    """Varre o JSON inteiro em busca de chaves de reação/TDLib/MTProto para diagnóstico."""
+    matches: list[dict[str, str]] = []
+    seen: set[int] = set()
+
+    def walk(value: Any, path: str, depth: int) -> None:
+        if len(matches) >= limit or depth > 18:
+            return
+        if isinstance(value, (dict, list)):
+            ident = id(value)
+            if ident in seen:
+                return
+            seen.add(ident)
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = _dump_path_join(path, key)
+                key_text = str(key)
+                if key_text in _REACTION_PROBE_KEYS or "reaction" in key_text.lower():
+                    matches.append({
+                        "path": child_path,
+                        "key": key_text,
+                        "summary": _dump_probe_value_summary(child),
+                    })
+                    if len(matches) >= limit:
+                        return
+                walk(child, child_path, depth + 1)
+                if len(matches) >= limit:
+                    return
+        elif isinstance(value, list):
+            for index, child in enumerate(value[:120]):
+                walk(child, _dump_path_join(path, index), depth + 1)
+                if len(matches) >= limit:
+                    return
+
+    walk(data, "", 0)
+    return matches
+
+
+def _dump_recursive_reaction_container_candidates(data: Any, *, limit: int = 80) -> list[tuple[str, dict[str, Any]]]:
+    """Fallback: encontra containers de reação em qualquer nível do dump."""
+    candidates: list[tuple[str, dict[str, Any]]] = []
+    seen: set[int] = set()
+
+    def add_candidate(source: str, container: dict[str, Any]) -> None:
+        if len(candidates) >= limit:
+            return
+        ident = id(container)
+        if ident in seen:
+            return
+        seen.add(ident)
+        candidates.append((source, container))
+
+    def walk(value: Any, path: str, depth: int) -> None:
+        if len(candidates) >= limit or depth > 18:
+            return
+        if isinstance(value, dict):
+            # Container direto: possui array conhecido ou flags/listas de reação.
+            if any(isinstance(value.get(key), list) for key in _REACTION_CONTAINER_KEYS):
+                add_candidate(f"recursive:{path or 'root'}", value)
+            elif any(key in value for key in ("canViewList", "canGetAddedReactions", "can_get_added_reactions", "can_see_list")):
+                add_candidate(f"recursive:{path or 'root'}", value)
+
+            for key, child in value.items():
+                child_path = _dump_path_join(path, key)
+                if str(key) in _REACTION_CONTAINER_KEYS:
+                    if isinstance(child, dict):
+                        add_candidate(f"recursive:{child_path}", child)
+                    elif isinstance(child, list):
+                        # MTProto/Pyrogram podem ter reactions.results/reaction_counts; Telegram app pode ter attr.reactions.
+                        wrapper_key = "results" if str(key) == "results" else "reactions"
+                        add_candidate(f"recursive:{child_path}", {wrapper_key: child})
+                walk(child, child_path, depth + 1)
+                if len(candidates) >= limit:
+                    return
+        elif isinstance(value, list):
+            for index, child in enumerate(value[:120]):
+                walk(child, _dump_path_join(path, index), depth + 1)
+                if len(candidates) >= limit:
+                    return
+
+    walk(data, "", 0)
+    return candidates
+
 def _dump_reaction_items_from_container(container: dict[str, Any]) -> list[dict[str, Any]]:
     raw_items: list[Any] = []
     source_key = ""
@@ -1212,10 +1361,15 @@ def _dump_reaction_items_from_container(container: dict[str, Any]) -> list[dict[
 
 
 def _dump_reaction_items(data: dict[str, Any]) -> tuple[list[dict[str, Any]], str | None, dict[str, Any] | None]:
-    """Retorna itens + formato detectado + container usado."""
+    """Retorna itens + formato detectado + container usado.
+
+    Primeiro tenta caminhos conhecidos; se não encontrar itens, faz varredura
+    recursiva em todo o dump para cobrir exports/clients com embrulhos novos.
+    """
     best_items: list[dict[str, Any]] = []
     best_source: str | None = None
     best_container: dict[str, Any] | None = None
+
     for source, container in _dump_reaction_container_candidates(data):
         items = _dump_reaction_items_from_container(container)
         if items:
@@ -1223,6 +1377,15 @@ def _dump_reaction_items(data: dict[str, Any]) -> tuple[list[dict[str, Any]], st
         if best_container is None:
             best_source = source
             best_container = container
+
+    for source, container in _dump_recursive_reaction_container_candidates(data):
+        items = _dump_reaction_items_from_container(container)
+        if items:
+            return items, source, container
+        if best_container is None:
+            best_source = source
+            best_container = container
+
     return best_items, best_source, best_container
 
 
@@ -1527,12 +1690,19 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
     if chat_id is None or message_id is None:
         raise ValueError("não consegui extrair chat_id/message_id do dump")
 
+    reaction_probe_paths = _dump_probe_reaction_paths(data)
+    reaction_probe_summary = [
+        f"{match['path']}={match['summary']}" for match in reaction_probe_paths[:12]
+    ]
+
     if not items:
         _audit_warning(
             "preactdeep_dump_no_reactions_found",
             chat_id=chat_id,
             message_id=message_id,
             source_format=source_format or "-",
+            probe_matches=len(reaction_probe_paths),
+            probe_preview=" | ".join(reaction_probe_summary[:6]) or "-",
         )
 
     return {
@@ -1560,6 +1730,9 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
         "stable_version": data.get("stableVersion"),
         "source_format": source_format or "unknown",
         "extra_metrics": _dump_extra_metrics(data),
+        "probe_matches": len(reaction_probe_paths),
+        "probe_paths": reaction_probe_paths[:12],
+        "probe_summary": reaction_probe_summary[:12],
     }
 
 def _metadata_bool_label(value: Any) -> str:
@@ -1606,11 +1779,30 @@ def _format_deep_result(analysis: dict[str, Any], *, saved_snapshot_lines: list[
         f"forwards: <code>{extra.get('forward_count') if extra.get('forward_count') is not None else '—'}</code> · "
         f"replies: <code>{extra.get('reply_count') if extra.get('reply_count') is not None else '—'}</code>\n"
     )
+    probe_summary = analysis.get("probe_summary") or []
+    probe_text = ""
+    if probe_summary:
+        probe_lines = "\n".join(
+            "• " + html.escape(str(line)) for line in probe_summary[:8]
+        )
+        probe_text = (
+            "\n<b>Varredura recursiva</b>\n"
+            f"chaves candidatas encontradas: <code>{int(analysis.get('probe_matches') or 0)}</code>\n"
+            f"{probe_lines}\n"
+        )
+    else:
+        probe_text = (
+            "\n<b>Varredura recursiva</b>\n"
+            "chaves candidatas encontradas: <code>0</code>\n"
+        )
+
     no_reactions_note = ""
     if int(analysis.get("reaction_kinds") or 0) == 0:
         no_reactions_note = (
             "\n<b>Aviso</b>\n"
             "não encontrei bloco de reações compatível neste dump; salvei os metadados disponíveis e mantive o diagnóstico local.\n"
+            "Se a varredura recursiva abaixo vier zerada, o arquivo provavelmente não contém bloco de reações. "
+            "Se vier com caminhos candidatos, o dump usa um formato novo para mapear.\n"
         )
     return (
         "<b>Diagnóstico deep de reações</b>\n\n"
@@ -1632,7 +1824,8 @@ def _format_deep_result(analysis: dict[str, Any], *, saved_snapshot_lines: list[
         f"paidReactors: <code>{analysis.get('paid_reactors_count', 0)}</code>\n"
         f"isTags: <code>{are_tags}</code>\n"
         f"modo: <code>{html.escape(str(analysis.get('data_mode') or '—'))}</code>\n"
-        f"{extra_metrics_line}\n"
+        f"{extra_metrics_line}"
+        f"{probe_text}\n"
         "<b>Snapshots gravados a partir do dump</b>\n"
         f"{snapshot_text}"
         f"{db_text}"
