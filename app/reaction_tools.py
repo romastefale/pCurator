@@ -2,6 +2,7 @@ import html
 import json
 import logging
 import re
+from io import BytesIO
 from collections import deque
 from datetime import datetime, timezone
 from typing import Any
@@ -1097,6 +1098,68 @@ def _dump_reaction_items(data: dict[str, Any]) -> list[dict[str, Any]]:
     return items
 
 
+_MAX_DUMP_FILE_BYTES = 5 * 1024 * 1024
+_ALLOWED_DUMP_EXTENSIONS = {".json", ".txt"}
+_ALLOWED_DUMP_MIME_TYPES = {"application/json", "text/plain", "text/json"}
+
+
+def _document_extension(filename: str | None) -> str:
+    if not filename:
+        return ""
+    lowered = filename.lower().strip()
+    dot = lowered.rfind(".")
+    return lowered[dot:] if dot >= 0 else ""
+
+
+async def _read_dump_document_text(source_message: Message, *, bot: Any) -> str | None:
+    """Lê dump anexado como .json/.txt sem aceitar binários grandes.
+
+    O comando permanece owner-only no handler; este helper só evita que dumps longos
+    precisem caber em uma mensagem de texto.
+    """
+    document = getattr(source_message, "document", None)
+    if not document:
+        return None
+
+    filename = getattr(document, "file_name", None)
+    extension = _document_extension(filename)
+    mime_type = str(getattr(document, "mime_type", None) or "")
+    if extension not in _ALLOWED_DUMP_EXTENSIONS and mime_type not in _ALLOWED_DUMP_MIME_TYPES:
+        raise ValueError("arquivo de dump precisa ser .json ou .txt")
+
+    file_size = getattr(document, "file_size", None)
+    if file_size is not None and int(file_size) > _MAX_DUMP_FILE_BYTES:
+        raise ValueError("arquivo de dump muito grande; limite atual é 5 MB")
+
+    telegram_file = await bot.get_file(document.file_id)
+    buffer = BytesIO()
+    await bot.download_file(telegram_file.file_path, destination=buffer)
+    raw = buffer.getvalue()
+    if len(raw) > _MAX_DUMP_FILE_BYTES:
+        raise ValueError("arquivo de dump muito grande; limite atual é 5 MB")
+
+    for encoding in ("utf-8-sig", "utf-8"):
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            text = ""
+    if not text:
+        text = raw.decode("utf-8", errors="replace")
+
+    text = text.strip()
+    if not text:
+        raise ValueError("arquivo de dump está vazio")
+
+    _audit_info(
+        "preactdeep_dump_file_loaded",
+        filename=filename or "-",
+        mime_type=mime_type or "-",
+        size=len(raw),
+    )
+    return text
+
+
 def _parse_dump_payload(text: str) -> dict[str, Any]:
     data = json.loads(_extract_json_candidate(text))
     if isinstance(data, list):
@@ -1382,13 +1445,28 @@ async def reaction_deep_command(message: Message) -> None:
     if await _ignore_if_not_owner_dm(message):
         return
 
-    payload = _command_payload(message.text or "")
+    payload = _command_payload(message.text or message.caption or "")
     reply_text = None
-    if message.reply_to_message:
-        reply_text = message.reply_to_message.text or message.reply_to_message.caption
+    dump_file_text = None
+    try:
+        if message.reply_to_message:
+            reply_text = message.reply_to_message.text or message.reply_to_message.caption
+            dump_file_text = await _read_dump_document_text(message.reply_to_message, bot=message.bot)
+        if dump_file_text is None:
+            dump_file_text = await _read_dump_document_text(message, bot=message.bot)
+    except Exception as exc:
+        await message.answer(
+            "<b>Diagnóstico deep</b>\n\n"
+            f"Não consegui ler o arquivo de dump: <code>{html.escape(str(exc))}</code>\n\n"
+            "Envie um arquivo <code>.json</code> ou <code>.txt</code> com até 5 MB e responda com <code>/preactdeep</code>."
+        )
+        return
 
     dump_text = None
-    if reply_text and (not payload or payload.lower() in {"dump", "json"}):
+    payload_mode = payload.lower().strip()
+    if dump_file_text and (not payload or payload_mode in {"dump", "json", "txt", "file", "arquivo"}):
+        dump_text = dump_file_text
+    elif reply_text and (not payload or payload_mode in {"dump", "json", "txt", "file", "arquivo"}):
         dump_text = reply_text
     elif payload.strip().startswith(("{", "[", "```")):
         dump_text = payload
@@ -1401,7 +1479,7 @@ async def reaction_deep_command(message: Message) -> None:
             await message.answer(
                 "<b>Diagnóstico deep</b>\n\n"
                 f"Não consegui parametrizar o dump JSON: <code>{html.escape(str(exc))}</code>\n\n"
-                "Use reply no dump completo e envie <code>/preactdeep</code>."
+                "Use reply no dump completo ou em um arquivo .json/.txt e envie <code>/preactdeep</code>."
             )
             return
 
@@ -1474,7 +1552,7 @@ async def reaction_deep_command(message: Message) -> None:
             "<b>Diagnóstico deep</b>\n\n"
             "Uso por link: <code>/preactdeep https://t.me/romastefale/118</code>\n"
             "Uso por ID já visto: <code>/preactdeep 118</code>\n"
-            "Uso por dump: responda ao JSON do dump com <code>/preactdeep</code>."
+            "Uso por dump: responda ao JSON colado ou a um arquivo .json/.txt com <code>/preactdeep</code>."
         )
         return
 
