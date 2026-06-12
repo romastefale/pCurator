@@ -1069,33 +1069,317 @@ def _dump_content_type(data: dict[str, Any]) -> str:
     return "unknown"
 
 
+def _first_present(mapping: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in mapping:
+            return mapping.get(key)
+    return None
+
+
+def _as_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
 def _dump_reaction_value(value: Any) -> tuple[str, str, str]:
+    """Normaliza tipos de reação em formatos Telegram app, Bot API, TDLib e MTProto/Pyrogram."""
     if isinstance(value, dict):
+        # Telegram app dump: {"builtin": "❤"}
         if value.get("builtin"):
             label = str(value["builtin"])
             return f"emoji:{label}", label, "emoji"
-        if value.get("customEmojiId") or value.get("custom_emoji_id"):
-            custom_id = str(value.get("customEmojiId") or value.get("custom_emoji_id"))
-            return f"custom_emoji:{custom_id}", f"custom:{custom_id}", "custom_emoji"
-        if value.get("paid") or value.get("stars"):
+
+        # TDLib/Bot API: {"@type": "reactionTypeEmoji", "emoji": "❤"} ou {"type": "emoji", "emoji": "❤"}
+        emoji = _first_present(value, "emoji", "emoticon", "reaction")
+        if isinstance(emoji, str) and emoji:
+            return f"emoji:{emoji}", emoji, "emoji"
+
+        # Alguns dumps aninham a reação dentro de type/value/reaction.
+        for nested_key in ("type", "value", "reaction"):
+            nested = value.get(nested_key)
+            if isinstance(nested, dict):
+                key, label, kind = _dump_reaction_value(nested)
+                if label != "unknown":
+                    return key, label, kind
+
+        custom_id = _first_present(value, "customEmojiId", "custom_emoji_id", "customEmoji", "document_id", "documentId")
+        if custom_id:
+            custom = str(custom_id)
+            return f"custom_emoji:{custom}", f"custom:{custom}", "custom_emoji"
+
+        raw_type = str(_first_present(value, "@type", "_", "type") or "")
+        if "paid" in raw_type.lower() or value.get("paid") or value.get("stars"):
             return "paid", "paid", "paid"
+        if raw_type and raw_type not in {"emoji", "custom_emoji", "reactionTypeEmoji"}:
+            return raw_type, raw_type, raw_type
+
     label = str(value or "unknown")
     return label, label, "unknown"
 
 
-def _dump_reaction_items(data: dict[str, Any]) -> list[dict[str, Any]]:
+def _reaction_total_from_raw(raw: dict[str, Any]) -> int:
+    total = _first_present(raw, "count", "total_count", "totalCount", "total")
+    return _safe_int(total) or 0
+
+
+def _chosen_order_from_raw(raw: dict[str, Any]) -> int | None:
+    return _safe_int(_first_present(raw, "chosenOrder", "chosen_order", "order"))
+
+
+def _dump_reaction_container_candidates(data: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """Encontra blocos de reações em dumps Telegram app, TDLib, MTProto/Pyrogram e Bot API."""
+    candidates: list[tuple[str, dict[str, Any]]] = []
+
     attr = _dump_reaction_attribute(data)
-    if not attr:
-        return []
+    if attr:
+        candidates.append(("telegram_app_attribute", attr))
+
+    direct_reactions = data.get("reactions")
+    if isinstance(direct_reactions, dict):
+        candidates.append(("root_reactions", direct_reactions))
+    elif isinstance(direct_reactions, list):
+        candidates.append(("root_reactions_list", {"reactions": direct_reactions}))
+
+    for path, source in [
+        (["interaction_info", "reactions"], "tdlib_interaction_info"),
+        (["interactionInfo", "reactions"], "tdlib_interactionInfo"),
+        (["interaction_info", "message_reactions"], "tdlib_message_reactions"),
+        (["interactionInfo", "messageReactions"], "tdlib_messageReactions"),
+        (["message", "reactions"], "wrapped_message_reactions"),
+        (["message", "interaction_info", "reactions"], "wrapped_tdlib_interaction_info"),
+        (["message", "interactionInfo", "reactions"], "wrapped_tdlib_interactionInfo"),
+        (["content", "reactions"], "content_reactions"),
+    ]:
+        value = _nested_get(data, path)
+        if isinstance(value, dict):
+            candidates.append((source, value))
+        elif isinstance(value, list):
+            candidates.append((source, {"reactions": value}))
+
+    # Remove duplicados por identidade do objeto para não processar o mesmo bloco duas vezes.
+    seen: set[int] = set()
+    unique: list[tuple[str, dict[str, Any]]] = []
+    for source, container in candidates:
+        ident = id(container)
+        if ident in seen:
+            continue
+        seen.add(ident)
+        unique.append((source, container))
+    return unique
+
+
+def _dump_reaction_items_from_container(container: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_items: list[Any] = []
+    source_key = ""
+    if isinstance(container.get("reactions"), list):
+        raw_items = container.get("reactions") or []
+        source_key = "reactions"
+    elif isinstance(container.get("results"), list):
+        raw_items = container.get("results") or []
+        source_key = "results"
+    elif isinstance(container.get("reaction_counts"), list):
+        raw_items = container.get("reaction_counts") or []
+        source_key = "reaction_counts"
+    elif isinstance(container.get("reactionCounts"), list):
+        raw_items = container.get("reactionCounts") or []
+        source_key = "reactionCounts"
+
     items: list[dict[str, Any]] = []
-    for raw in attr.get("reactions") or []:
+    for raw in raw_items:
         if not isinstance(raw, dict):
             continue
-        key, label, kind = _dump_reaction_value(raw.get("value"))
-        total = _safe_int(raw.get("count")) or 0
-        chosen_order = _safe_int(raw.get("chosenOrder"))
-        items.append({"key": key, "label": label, "kind": kind, "total": total, "chosen_order": chosen_order})
+
+        # Telegram app: value/count. TDLib/Bot API: type/total_count. MTProto/Pyrogram: reaction/count.
+        reaction_value = None
+        for key in ("value", "type", "reaction"):
+            if key in raw:
+                reaction_value = raw.get(key)
+                break
+        if reaction_value is None and (raw.get("emoji") or raw.get("emoticon") or raw.get("builtin")):
+            reaction_value = raw
+
+        key, label, kind = _dump_reaction_value(reaction_value)
+        total = _reaction_total_from_raw(raw)
+        chosen_order = _chosen_order_from_raw(raw)
+        items.append({
+            "key": key,
+            "label": label,
+            "kind": kind,
+            "total": total,
+            "chosen_order": chosen_order,
+            "source_key": source_key,
+        })
     return items
+
+
+def _dump_reaction_items(data: dict[str, Any]) -> tuple[list[dict[str, Any]], str | None, dict[str, Any] | None]:
+    """Retorna itens + formato detectado + container usado."""
+    best_items: list[dict[str, Any]] = []
+    best_source: str | None = None
+    best_container: dict[str, Any] | None = None
+    for source, container in _dump_reaction_container_candidates(data):
+        items = _dump_reaction_items_from_container(container)
+        if items:
+            return items, source, container
+        if best_container is None:
+            best_source = source
+            best_container = container
+    return best_items, best_source, best_container
+
+
+def _dump_bool_from_container(container: dict[str, Any] | None, data: dict[str, Any], *names: str) -> bool | None:
+    for source in [container, data]:
+        if not isinstance(source, dict):
+            continue
+        value = _first_present(source, *names)
+        if value is None:
+            continue
+        return bool(value)
+    return None
+
+
+def _dump_list_count(container: dict[str, Any] | None, data: dict[str, Any], *names: str) -> int:
+    for source in [container, data]:
+        if not isinstance(source, dict):
+            continue
+        value = _first_present(source, *names)
+        if isinstance(value, list):
+            return len(value)
+    return 0
+
+
+def _dump_extra_metrics(data: dict[str, Any]) -> dict[str, Any]:
+    interaction = data.get("interaction_info") if isinstance(data.get("interaction_info"), dict) else None
+    if interaction is None and isinstance(data.get("interactionInfo"), dict):
+        interaction = data.get("interactionInfo")
+    if interaction is None and isinstance(_nested_get(data, ["message", "interaction_info"]), dict):
+        interaction = _nested_get(data, ["message", "interaction_info"])
+    if interaction is None and isinstance(_nested_get(data, ["message", "interactionInfo"]), dict):
+        interaction = _nested_get(data, ["message", "interactionInfo"])
+    interaction = interaction or {}
+
+    reply_info = interaction.get("reply_info") or interaction.get("replyInfo") or {}
+    reply_count = None
+    if isinstance(reply_info, dict):
+        reply_count = _safe_int(_first_present(reply_info, "reply_count", "replyCount", "count"))
+
+    return {
+        "view_count": _safe_int(_first_present(interaction, "view_count", "viewCount", "views")),
+        "forward_count": _safe_int(_first_present(interaction, "forward_count", "forwardCount", "forwards")),
+        "reply_count": reply_count,
+    }
+
+
+def _dump_message_id(data: dict[str, Any]) -> int | None:
+    for value in [
+        data.get("message_id"),
+        data.get("messageId"),
+        _nested_get(data, ["message", "message_id"]),
+        _nested_get(data, ["message", "messageId"]),
+    ]:
+        number = _safe_int(value)
+        if number is not None:
+            return number
+
+    # TDLib usa id numérico simples como ID da mensagem quando chat_id está no objeto.
+    if data.get("chat_id") is not None or data.get("chatId") is not None:
+        number = _safe_int(data.get("id"))
+        if number is not None:
+            return number
+
+    for path in [["id", "id"], ["id", "rawValue"], ["message", "id"]]:
+        number = _safe_int(_nested_get(data, path))
+        if number is not None:
+            return number
+
+    return _safe_int(data.get("stableId"))
+
+
+def _dump_chat_id(data: dict[str, Any]) -> int | None:
+    for value in [
+        data.get("chat_id"),
+        data.get("chatId"),
+        _nested_get(data, ["chat", "id"]),
+        _nested_get(data, ["message", "chat_id"]),
+        _nested_get(data, ["message", "chatId"]),
+        _nested_get(data, ["message", "chat", "id"]),
+    ]:
+        number = _safe_int(value)
+        if number is not None:
+            return _chat_id_from_dump_peer(number)
+
+    peer_raw = _nested_get(data, ["id", "peerId", "id", "rawValue"])
+    if peer_raw is None:
+        peer_raw = _nested_get(data, ["author", "id", "id", "rawValue"])
+    if peer_raw is None:
+        peer_raw = _nested_get(data, ["peer_id", "channel_id"])
+    if peer_raw is None:
+        peer_raw = _nested_get(data, ["peerId", "channelId"])
+    if peer_raw is None:
+        peer_raw = _nested_get(data, ["peerId", "id"])
+    return _chat_id_from_dump_peer(peer_raw)
+
+
+def _dump_text_preview(data: dict[str, Any]) -> str | None:
+    candidates = [
+        data.get("text"),
+        data.get("caption"),
+        _nested_get(data, ["content", "text", "text"]),
+        _nested_get(data, ["content", "caption", "text"]),
+        _nested_get(data, ["message", "text"]),
+        _nested_get(data, ["message", "content", "text", "text"]),
+        _nested_get(data, ["message", "content", "caption", "text"]),
+    ]
+    for value in candidates:
+        if isinstance(value, dict):
+            value = value.get("text")
+        text = _short_text(value, 180)
+        if text:
+            return text
+    return None
+
+
+def _dump_signature(data: dict[str, Any]) -> str | None:
+    for key in ("signature", "post_author", "postAuthor", "author_signature", "authorSignature"):
+        text = _short_text(data.get(key), 80)
+        if text:
+            return text
+    for attr in _dump_attributes(data):
+        if isinstance(attr, dict) and attr.get("signature"):
+            return _short_text(attr.get("signature"), 80)
+    return None
+
+
+def _dump_content_type(data: dict[str, Any]) -> str:
+    content = data.get("content") if isinstance(data.get("content"), dict) else None
+    if content is None and isinstance(_nested_get(data, ["message", "content"]), dict):
+        content = _nested_get(data, ["message", "content"])
+    if isinstance(content, dict):
+        raw_type = str(_first_present(content, "@type", "_", "type") or "")
+        if raw_type:
+            cleaned = raw_type.replace("message", "", 1) if raw_type.startswith("message") else raw_type
+            return cleaned[:80] or raw_type[:80]
+
+    media = data.get("media")
+    if isinstance(media, list) and media:
+        for item in media:
+            if isinstance(item, dict) and ("imageId" in item or "representations" in item):
+                return "photo"
+        return "media"
+    if data.get("photo") or _nested_get(data, ["content", "photo"]):
+        return "photo"
+    if _dump_text_preview(data):
+        return "text"
+    return "unknown"
+
+
+def _dump_count_values(data: dict[str, Any]) -> dict[str, Any]:
+    attribute_counts: list[int] = []
+    for attr in _dump_attributes(data):
+        if isinstance(attr, dict) and "count" in attr:
+            number = _safe_int(attr.get("count"))
+            if number is not None:
+                attribute_counts.append(number)
+    return {"attribute_counts": attribute_counts, **_dump_extra_metrics(data)}
 
 
 _MAX_DUMP_FILE_BYTES = 5 * 1024 * 1024
@@ -1169,13 +1453,10 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("dump precisa ser um objeto JSON")
 
-    peer_raw = _nested_get(data, ["id", "peerId", "id", "rawValue"])
-    if peer_raw is None:
-        peer_raw = _nested_get(data, ["author", "id", "id", "rawValue"])
-    chat_id = _chat_id_from_dump_peer(peer_raw)
-    message_id = _safe_int(_nested_get(data, ["id", "id"])) or _safe_int(data.get("stableId"))
-    username = _nested_get(data, ["author", "username"])
-    title = _nested_get(data, ["author", "title"])
+    chat_id = _dump_chat_id(data)
+    message_id = _dump_message_id(data)
+    username = _nested_get(data, ["author", "username"]) or _nested_get(data, ["chat", "username"]) or _nested_get(data, ["sender_chat", "username"])
+    title = _nested_get(data, ["author", "title"]) or _nested_get(data, ["chat", "title"]) or _nested_get(data, ["sender_chat", "title"])
 
     if not username or not title:
         for peer in _nested_get(data, ["peers", "items"], []) or []:
@@ -1187,20 +1468,72 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
                 title = title or candidate.get("title")
                 break
 
-    items = _dump_reaction_items(data)
+    items, source_format, reaction_container = _dump_reaction_items(data)
     stats = _reaction_stats_from_items(items)
     reaction_label = " · ".join(f"{item['label']}: {item['total']}" for item in items) or "—"
-    reaction_attr = _dump_reaction_attribute(data) or {}
-    can_view_list = reaction_attr.get("canViewList")
-    recent_peers = reaction_attr.get("recentPeers") if isinstance(reaction_attr.get("recentPeers"), list) else []
-    top_peers = reaction_attr.get("topPeers") if isinstance(reaction_attr.get("topPeers"), list) else []
-    paid_reactors = reaction_attr.get("paidReactors") if isinstance(reaction_attr.get("paidReactors"), list) else []
-    are_tags = reaction_attr.get("isTags")
-    data_mode = "list_available" if bool(can_view_list) else "aggregate_anonymous"
+
+    can_view_list = _dump_bool_from_container(
+        reaction_container,
+        data,
+        "canViewList",
+        "canGetAddedReactions",
+        "can_get_added_reactions",
+        "can_see_list",
+        "canSeeList",
+    )
+    recent_peers_count = _dump_list_count(
+        reaction_container,
+        data,
+        "recentPeers",
+        "recent_peers",
+        "recentReactions",
+        "recent_reactions",
+        "recentSenderIds",
+        "recent_sender_ids",
+        "recent_chooser_dialog_ids",
+    )
+    top_peers_count = _dump_list_count(
+        reaction_container,
+        data,
+        "topPeers",
+        "top_peers",
+        "topReactors",
+        "top_reactors",
+    )
+    paid_reactors_count = _dump_list_count(
+        reaction_container,
+        data,
+        "paidReactors",
+        "paid_reactors",
+        "paid_reactor_ids",
+    )
+    are_tags = _dump_bool_from_container(
+        reaction_container,
+        data,
+        "isTags",
+        "areTags",
+        "are_tags",
+    )
+
+    if can_view_list is True:
+        data_mode = "list_available"
+    elif can_view_list is False:
+        data_mode = "aggregate_anonymous"
+    else:
+        data_mode = "unknown_no_list_flag" if not items else "aggregate_or_unknown"
+
     post_link = f"https://t.me/{username}/{message_id}" if username and message_id else None
 
     if chat_id is None or message_id is None:
         raise ValueError("não consegui extrair chat_id/message_id do dump")
+
+    if not items:
+        _audit_warning(
+            "preactdeep_dump_no_reactions_found",
+            chat_id=chat_id,
+            message_id=message_id,
+            source_format=source_format or "-",
+        )
 
     return {
         "chat_id": chat_id,
@@ -1208,14 +1541,14 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
         "chat_username": str(username) if username else None,
         "chat_title": str(title) if title else None,
         "post_link": post_link or f"channel:{chat_id}/{message_id}",
-        "text_preview": _short_text(data.get("text"), 180),
+        "text_preview": _dump_text_preview(data),
         "signature": _dump_signature(data),
         "content_type": _dump_content_type(data),
-        "can_view_list": None if can_view_list is None else bool(can_view_list),
-        "recent_peers_count": len(recent_peers),
-        "top_peers_count": len(top_peers),
-        "paid_reactors_count": len(paid_reactors),
-        "are_tags": None if are_tags is None else bool(are_tags),
+        "can_view_list": can_view_list,
+        "recent_peers_count": recent_peers_count,
+        "top_peers_count": top_peers_count,
+        "paid_reactors_count": paid_reactors_count,
+        "are_tags": are_tags,
         "reaction_items": items,
         "reaction_label": reaction_label,
         "total_reactions": int(stats["total_reactions"]),
@@ -1225,8 +1558,9 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
         "raw_count_values": _dump_count_values(data),
         "stable_id": data.get("stableId"),
         "stable_version": data.get("stableVersion"),
+        "source_format": source_format or "unknown",
+        "extra_metrics": _dump_extra_metrics(data),
     }
-
 
 def _metadata_bool_label(value: Any) -> str:
     if value is None:
@@ -1264,6 +1598,20 @@ def _format_deep_result(analysis: dict[str, Any], *, saved_snapshot_lines: list[
     are_tags = _metadata_bool_label(analysis.get("are_tags"))
     snapshot_text = "\n".join(saved_snapshot_lines) if saved_snapshot_lines else "—"
     db_text = ("\n\n" + db_block) if db_block else ""
+    extra = analysis.get("extra_metrics") or {}
+    source_format = html.escape(str(analysis.get("source_format") or "unknown"))
+    extra_metrics_line = (
+        f"formato detectado: <code>{source_format}</code>\n"
+        f"views: <code>{extra.get('view_count') if extra.get('view_count') is not None else '—'}</code> · "
+        f"forwards: <code>{extra.get('forward_count') if extra.get('forward_count') is not None else '—'}</code> · "
+        f"replies: <code>{extra.get('reply_count') if extra.get('reply_count') is not None else '—'}</code>\n"
+    )
+    no_reactions_note = ""
+    if int(analysis.get("reaction_kinds") or 0) == 0:
+        no_reactions_note = (
+            "\n<b>Aviso</b>\n"
+            "não encontrei bloco de reações compatível neste dump; salvei os metadados disponíveis e mantive o diagnóstico local.\n"
+        )
     return (
         "<b>Diagnóstico deep de reações</b>\n\n"
         f"Canal: <b>{title}</b> · <code>{username_line}</code>\n"
@@ -1283,10 +1631,12 @@ def _format_deep_result(analysis: dict[str, Any], *, saved_snapshot_lines: list[
         f"topPeers: <code>{analysis.get('top_peers_count', 0)}</code> · "
         f"paidReactors: <code>{analysis.get('paid_reactors_count', 0)}</code>\n"
         f"isTags: <code>{are_tags}</code>\n"
-        f"modo: <code>{html.escape(str(analysis.get('data_mode') or '—'))}</code>\n\n"
+        f"modo: <code>{html.escape(str(analysis.get('data_mode') or '—'))}</code>\n"
+        f"{extra_metrics_line}\n"
         "<b>Snapshots gravados a partir do dump</b>\n"
         f"{snapshot_text}"
-        f"{db_text}\n\n"
+        f"{db_text}"
+        f"{no_reactions_note}\n\n"
         "<b>Campos ignorados por segurança</b>\n"
         "<code>accessHash</code>, <code>fileReference</code>, <code>pointerValue</code>, bytes de thumbnail e IDs internos de mídia."
     )
@@ -1541,6 +1891,7 @@ async def reaction_deep_command(message: Message) -> None:
             total_reactions=analysis.get("total_reactions"),
             reaction_kinds=analysis.get("reaction_kinds"),
             can_view_list=analysis.get("can_view_list"),
+            source_format=analysis.get("source_format"),
             metadata_id=metadata.get("id"),
         )
         await message.answer(_format_deep_result(analysis, saved_snapshot_lines=snapshot_lines))
