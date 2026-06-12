@@ -45,6 +45,33 @@ _REACTION_COUNTS: dict[tuple[int, int], str] = {}
 _MAX_EVENTS_PER_POST = 12
 
 
+def _safe_log_value(value: Any) -> str:
+    if value is None:
+        return "-"
+    text = str(value).replace("\n", " ").replace("\r", " ").strip()
+    return text[:240] if len(text) > 240 else text
+
+
+def _audit_info(event: str, **fields: Any) -> None:
+    payload = " ".join(f"{key}={_safe_log_value(value)}" for key, value in fields.items())
+    if payload:
+        logger.info("[pCurator reactions] %s %s", event, payload)
+    else:
+        logger.info("[pCurator reactions] %s", event)
+
+
+def _audit_warning(event: str, **fields: Any) -> None:
+    payload = " ".join(f"{key}={_safe_log_value(value)}" for key, value in fields.items())
+    if payload:
+        logger.warning("[pCurator reactions] %s %s", event, payload)
+    else:
+        logger.warning("[pCurator reactions] %s", event)
+
+
+def _now_label() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _command_payload(text: str) -> str:
     parts = (text or "").split(maxsplit=1)
     if len(parts) < 2:
@@ -214,14 +241,42 @@ def _format_cached_probe(chat_id: int, message_id: int) -> str:
     return "\n\n".join(parts)
 
 
-async def _notify_owner(bot: Any, text: str) -> None:
+async def _notify_owner(
+    bot: Any,
+    text: str,
+    *,
+    event_type: str,
+    chat_id: int | None = None,
+    message_id: int | None = None,
+) -> None:
     settings = get_settings()
     if not settings.owner_id:
+        _audit_warning(
+            "owner_notify_skipped",
+            reason="owner_id_missing",
+            event_type=event_type,
+            chat_id=chat_id,
+            message_id=message_id,
+        )
         return
     try:
         await bot.send_message(settings.owner_id, text)
+        _audit_info(
+            "owner_notify_sent",
+            owner_id=settings.owner_id,
+            event_type=event_type,
+            chat_id=chat_id,
+            message_id=message_id,
+        )
     except Exception as exc:
-        logger.warning("reaction_owner_notify_failed err=%s", type(exc).__name__)
+        _audit_warning(
+            "owner_notify_failed",
+            owner_id=settings.owner_id,
+            event_type=event_type,
+            chat_id=chat_id,
+            message_id=message_id,
+            error=type(exc).__name__,
+        )
 
 
 async def _ignore_if_not_owner_dm(message: Message) -> bool:
@@ -232,9 +287,24 @@ async def _ignore_if_not_owner_dm(message: Message) -> bool:
     o requisito de nenhuma interação pública/externa para esta implementação.
     """
     if str(message.chat.type) != "private":
+        _audit_info(
+            "owner_only_command_ignored",
+            reason="not_private_chat",
+            chat_id=getattr(message.chat, "id", None),
+            chat_type=getattr(message.chat, "type", None),
+            from_user_id=getattr(message.from_user, "id", None),
+        )
         return True
     user_id = message.from_user.id if message.from_user else None
-    return not is_owner_id(user_id)
+    if not is_owner_id(user_id):
+        _audit_info(
+            "owner_only_command_ignored",
+            reason="not_owner",
+            chat_id=getattr(message.chat, "id", None),
+            from_user_id=user_id,
+        )
+        return True
+    return False
 
 
 async def _ensure_watch_for_seen_post(
@@ -267,15 +337,41 @@ async def _ensure_watch_for_seen_post(
         source=source if not watch else str(watch.get("source") or source),
     )
 
+    if not watch:
+        _audit_info(
+            "watch_created",
+            source=source,
+            chat_id=chat_id,
+            message_id=message_id,
+            title=title,
+            username=username,
+            ref=post_link,
+        )
+    else:
+        _audit_info(
+            "watch_confirmed",
+            source=source,
+            chat_id=chat_id,
+            message_id=message_id,
+            title=title,
+            username=username,
+            ref=post_link,
+        )
+
     if notify_owner and not watch:
         await _notify_owner(
             bot,
-            "<b>pCurator: post em monitoramento</b>\n\n"
-            f"Canal: <b>{html.escape(title)}</b> · <code>{chat_id}</code>\n"
+            "<b>Post de canal monitorado</b>\n\n"
+            f"Canal: <b>{html.escape(title)}</b>\n"
+            f"Chat ID: <code>{chat_id}</code>\n"
             f"Post: <code>{message_id}</code>\n"
             f"Origem: <code>{html.escape(source)}</code>\n"
-            f"Ref: <code>{html.escape(post_link)}</code>\n\n"
-            "Vou avisar aqui na DM quando o Telegram entregar atualização de reação desse post.",
+            f"Ref: <code>{html.escape(post_link)}</code>\n"
+            f"Horário: <code>{html.escape(_now_label())}</code>\n\n"
+            "Status: monitoramento ativado. Vou avisar aqui na DM quando o Telegram entregar atualização de reação desse post.",
+            event_type="channel_post_watch",
+            chat_id=chat_id,
+            message_id=message_id,
         )
 
     return await get_reaction_watch(database_path, chat_id, message_id)
@@ -397,7 +493,12 @@ async def channel_post_seen_handler(message: Message) -> None:
         source="channel_post_seen",
         notify_owner=True,
     )
-    logger.info("reaction_auto_watch_channel_post chat_id=%s message_id=%s", message.chat.id, message.message_id)
+    _audit_info(
+        "channel_post_received",
+        chat_id=message.chat.id,
+        message_id=message.message_id,
+        title=_chat_title(message.chat),
+    )
 
 
 @router.edited_channel_post()
@@ -412,7 +513,12 @@ async def edited_channel_post_seen_handler(message: Message) -> None:
         source="edited_channel_post_seen",
         notify_owner=False,
     )
-    logger.info("reaction_auto_watch_edited_channel_post chat_id=%s message_id=%s", message.chat.id, message.message_id)
+    _audit_info(
+        "edited_channel_post_received",
+        chat_id=message.chat.id,
+        message_id=message.message_id,
+        title=_chat_title(message.chat),
+    )
 
 
 @router.message_reaction()
@@ -425,6 +531,17 @@ async def reaction_update_handler(update: MessageReactionUpdated) -> None:
     old_reaction = _reaction_list_label(update.old_reaction)
     new_reaction = _reaction_list_label(update.new_reaction)
     moment = datetime.now().strftime("%H:%M:%S")
+
+    _audit_info(
+        "message_reaction_received",
+        chat_id=chat_id,
+        message_id=message_id,
+        actor_user_id=actor_data.get("actor_user_id"),
+        actor_username=actor_data.get("actor_username"),
+        actor_chat_id=actor_data.get("actor_chat_id"),
+        old_reaction=old_reaction,
+        new_reaction=new_reaction,
+    )
 
     line = (
         f"• <code>{moment}</code> — {actor}: "
@@ -453,20 +570,41 @@ async def reaction_update_handler(update: MessageReactionUpdated) -> None:
         new_reaction=new_reaction,
         **actor_data,
     )
+    _audit_info(
+        "reaction_event_saved",
+        event_type="message_reaction",
+        chat_id=chat_id,
+        message_id=message_id,
+        old_reaction=old_reaction,
+        new_reaction=new_reaction,
+    )
 
     title = _chat_title(update.chat)
     ref = (watch or {}).get("post_link") or _post_ref(update.chat, message_id)
     await _notify_owner(
         update.bot,
-        "<b>pCurator: reação atualizada</b>\n\n"
-        f"Canal: <b>{html.escape(title)}</b> · <code>{chat_id}</code>\n"
+        "<b>Nova reação detectada</b>\n\n"
+        f"Canal: <b>{html.escape(title)}</b>\n"
+        f"Chat ID: <code>{chat_id}</code>\n"
         f"Post: <code>{message_id}</code>\n"
         f"Ator: {actor}\n"
-        f"Reação: <code>{html.escape(old_reaction)}</code> → <code>{html.escape(new_reaction)}</code>\n"
-        f"Ref: <code>{html.escape(str(ref))}</code>",
+        f"Antes: <code>{html.escape(old_reaction)}</code>\n"
+        f"Agora: <code>{html.escape(new_reaction)}</code>\n"
+        f"Evento: <code>message_reaction</code>\n"
+        f"Ref: <code>{html.escape(str(ref))}</code>\n"
+        f"Horário: <code>{html.escape(_now_label())}</code>",
+        event_type="message_reaction",
+        chat_id=chat_id,
+        message_id=message_id,
     )
 
-    logger.info("reaction_update chat_id=%s message_id=%s", chat_id, message_id)
+    _audit_info(
+        "message_reaction_handled",
+        chat_id=chat_id,
+        message_id=message_id,
+        old_reaction=old_reaction,
+        new_reaction=new_reaction,
+    )
 
 
 @router.message_reaction_count()
@@ -476,6 +614,13 @@ async def reaction_count_handler(update: MessageReactionCountUpdated) -> None:
     message_id = update.message_id
     count_label = _reaction_count_label(update.reactions)
     _REACTION_COUNTS[(chat_id, message_id)] = count_label
+
+    _audit_info(
+        "message_reaction_count_received",
+        chat_id=chat_id,
+        message_id=message_id,
+        reactions=count_label,
+    )
 
     settings = get_settings()
     watch = await get_reaction_watch(settings.database_path, chat_id, message_id)
@@ -496,20 +641,38 @@ async def reaction_count_handler(update: MessageReactionCountUpdated) -> None:
         event_type="reaction_count",
         reactions=count_label,
     )
+    _audit_info(
+        "reaction_event_saved",
+        event_type="message_reaction_count",
+        chat_id=chat_id,
+        message_id=message_id,
+        reactions=count_label,
+    )
 
     title = _chat_title(update.chat)
     ref = (watch or {}).get("post_link") or _post_ref(update.chat, message_id)
     await _notify_owner(
         update.bot,
-        "<b>pCurator: contagem de reações atualizada</b>\n\n"
-        f"Canal: <b>{html.escape(title)}</b> · <code>{chat_id}</code>\n"
+        "<b>Contagem de reações atualizada</b>\n\n"
+        f"Canal: <b>{html.escape(title)}</b>\n"
+        f"Chat ID: <code>{chat_id}</code>\n"
         f"Post: <code>{message_id}</code>\n"
-        f"Contagem: <code>{html.escape(count_label)}</code>\n"
-        f"Ref: <code>{html.escape(str(ref))}</code>\n\n"
+        f"Reações: <code>{html.escape(count_label)}</code>\n"
+        f"Evento: <code>message_reaction_count</code>\n"
+        f"Ref: <code>{html.escape(str(ref))}</code>\n"
+        f"Horário: <code>{html.escape(_now_label())}</code>\n\n"
         "Observação: em canal broadcast isso pode vir agregado/anônimo e com atraso do Telegram.",
+        event_type="message_reaction_count",
+        chat_id=chat_id,
+        message_id=message_id,
     )
 
-    logger.info("reaction_count_update chat_id=%s message_id=%s", chat_id, message_id)
+    _audit_info(
+        "message_reaction_count_handled",
+        chat_id=chat_id,
+        message_id=message_id,
+        reactions=count_label,
+    )
 
 
 @router.message(Command("preactwatch"))
