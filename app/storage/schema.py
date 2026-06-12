@@ -133,4 +133,28 @@ ON reaction_watches(chat_id, message_id);
 CREATE INDEX IF NOT EXISTS idx_reaction_events_post
 ON reaction_events(chat_id, message_id, id);
 
+
+CREATE TABLE IF NOT EXISTS reaction_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    reaction_key TEXT NOT NULL,
+    reaction_type TEXT NOT NULL,
+    total_count INTEGER NOT NULL,
+    previous_count INTEGER,
+    delta_count INTEGER,
+    total_reactions INTEGER,
+    reaction_kinds INTEGER,
+    dominant_reaction TEXT,
+    data_mode TEXT NOT NULL DEFAULT 'aggregate_anonymous',
+    telegram_date TEXT,
+    captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_reaction_snapshots_post
+ON reaction_snapshots(chat_id, message_id, id);
+
+CREATE INDEX IF NOT EXISTS idx_reaction_snapshots_key
+ON reaction_snapshots(chat_id, message_id, reaction_key, id);
+
 """

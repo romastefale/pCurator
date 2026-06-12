@@ -158,3 +158,131 @@ async def list_reaction_events(
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in reversed(rows)]
+
+async def record_reaction_snapshot(
+    database_path: str,
+    *,
+    chat_id: int,
+    message_id: int,
+    reaction_key: str,
+    reaction_type: str,
+    total_count: int,
+    data_mode: str,
+    telegram_date: str | None = None,
+    total_reactions: int | None = None,
+    reaction_kinds: int | None = None,
+    dominant_reaction: str | None = None,
+) -> dict:
+    """Persiste um snapshot estatístico de reação e calcula delta contra o último snapshot salvo."""
+    async with aiosqlite.connect(database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT total_count
+            FROM reaction_snapshots
+            WHERE chat_id = ? AND message_id = ? AND reaction_key = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (chat_id, message_id, reaction_key),
+        )
+        previous = await cursor.fetchone()
+        previous_count = int(previous["total_count"]) if previous else None
+        delta_count = None if previous_count is None else int(total_count) - previous_count
+        await db.execute(
+            """
+            INSERT INTO reaction_snapshots (
+                chat_id, message_id, reaction_key, reaction_type,
+                total_count, previous_count, delta_count,
+                total_reactions, reaction_kinds, dominant_reaction,
+                data_mode, telegram_date, captured_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (
+                chat_id,
+                message_id,
+                reaction_key,
+                reaction_type,
+                total_count,
+                previous_count,
+                delta_count,
+                total_reactions,
+                reaction_kinds,
+                dominant_reaction,
+                data_mode,
+                telegram_date,
+            ),
+        )
+        await db.commit()
+        cursor = await db.execute(
+            """
+            SELECT *
+            FROM reaction_snapshots
+            WHERE rowid = last_insert_rowid()
+            """
+        )
+        row = await cursor.fetchone()
+        return dict(row)
+
+
+async def latest_reaction_snapshots(
+    database_path: str,
+    chat_id: int,
+    message_id: int,
+) -> list[dict]:
+    """Retorna o snapshot mais recente de cada reação para um post."""
+    async with aiosqlite.connect(database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT s.*
+            FROM reaction_snapshots s
+            JOIN (
+                SELECT reaction_key, MAX(id) AS max_id
+                FROM reaction_snapshots
+                WHERE chat_id = ? AND message_id = ?
+                GROUP BY reaction_key
+            ) last ON last.max_id = s.id
+            ORDER BY s.total_count DESC, s.reaction_key ASC
+            """,
+            (chat_id, message_id),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+
+async def list_recent_reaction_snapshots(
+    database_path: str,
+    limit: int = 500,
+) -> list[dict]:
+    """Retorna snapshots recentes para comandos agregados em DM."""
+    async with aiosqlite.connect(database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT s.*, w.channel_title, w.channel_username, w.post_link, w.source
+            FROM reaction_snapshots s
+            LEFT JOIN reaction_watches w
+              ON w.chat_id = s.chat_id AND w.message_id = s.message_id
+            ORDER BY s.id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+
+async def reaction_event_count(database_path: str, chat_id: int, message_id: int) -> int:
+    async with aiosqlite.connect(database_path) as db:
+        cursor = await db.execute(
+            """
+            SELECT COUNT(*)
+            FROM reaction_events
+            WHERE chat_id = ? AND message_id = ?
+            """,
+            (chat_id, message_id),
+        )
+        row = await cursor.fetchone()
+        return int(row[0] or 0)

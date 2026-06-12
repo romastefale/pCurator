@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from aiogram import Router
@@ -16,9 +16,13 @@ from app.settings import get_settings
 from app.storage.reactions import (
     deactivate_reaction_watch,
     get_reaction_watch,
+    latest_reaction_snapshots,
+    list_recent_reaction_snapshots,
     list_reaction_events,
     list_reaction_watches,
+    reaction_event_count,
     record_reaction_event,
+    record_reaction_snapshot,
     upsert_reaction_watch,
 )
 
@@ -151,6 +155,89 @@ def _reaction_count_label(values: Any) -> str:
         else:
             lines.append(f"{reaction}: {total}")
     return " · ".join(lines)
+
+
+def _telegram_date_iso(value: Any) -> str | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        return str(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def _reaction_type_parts(value: Any) -> tuple[str, str, str]:
+    """Retorna (key, label, kind) de forma estável para emoji/custom/paid."""
+    if value is None:
+        return "unknown", "—", "unknown"
+
+    kind = str(getattr(value, "type", None) or "unknown")
+    emoji = getattr(value, "emoji", None)
+    if emoji:
+        return f"emoji:{emoji}", str(emoji), "emoji"
+
+    custom_emoji_id = getattr(value, "custom_emoji_id", None)
+    if custom_emoji_id:
+        return f"custom_emoji:{custom_emoji_id}", f"custom:{custom_emoji_id}", "custom_emoji"
+
+    if kind and kind != "unknown":
+        return kind, kind, kind
+
+    return str(value), str(value), "unknown"
+
+
+def _reaction_count_items(values: Any) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    if not values:
+        return items
+    for item in values:
+        key, label, kind = _reaction_type_parts(getattr(item, "type", None))
+        total = getattr(item, "total_count", 0) or 0
+        try:
+            total_int = int(total)
+        except (TypeError, ValueError):
+            total_int = 0
+        items.append({"key": key, "label": label, "kind": kind, "total": total_int})
+    return items
+
+
+def _reaction_stats_from_items(items: list[dict[str, Any]]) -> dict[str, Any]:
+    total = sum(int(item.get("total") or 0) for item in items)
+    kinds = len(items)
+    dominant = "—"
+    if items:
+        dominant = max(items, key=lambda item: int(item.get("total") or 0)).get("label") or "—"
+    return {"total_reactions": total, "reaction_kinds": kinds, "dominant_reaction": dominant}
+
+
+def _delta_label(snapshot: dict[str, Any]) -> str:
+    previous = snapshot.get("previous_count")
+    delta = snapshot.get("delta_count")
+    current = snapshot.get("total_count")
+    if previous is None or delta is None:
+        return f"{current} · primeiro snapshot"
+    sign = "+" if int(delta) > 0 else ""
+    return f"{previous} → {current} ({sign}{delta})"
+
+
+def _snapshot_summary_line(snapshot: dict[str, Any]) -> str:
+    label = str(snapshot.get("dominant_reaction") or snapshot.get("reaction_key") or "—")
+    reaction_key = str(snapshot.get("reaction_key") or "")
+    if reaction_key.startswith("emoji:"):
+        label = reaction_key.split(":", 1)[1]
+    return f"{html.escape(label)}: <code>{html.escape(_delta_label(snapshot))}</code>"
+
+
+def _snapshot_csv_value(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).replace('"', '""')
+    if any(ch in text for ch in [",", "\n", '"']):
+        return f'"{text}"'
+    return text
 
 
 def _actor_data(update: MessageReactionUpdated) -> dict[str, Any]:
@@ -649,6 +736,38 @@ async def reaction_count_handler(update: MessageReactionCountUpdated) -> None:
         reactions=count_label,
     )
 
+    items = _reaction_count_items(update.reactions)
+    stats = _reaction_stats_from_items(items)
+    telegram_date = _telegram_date_iso(getattr(update, "date", None))
+    snapshots: list[dict[str, Any]] = []
+    for item in items:
+        snapshot = await record_reaction_snapshot(
+            settings.database_path,
+            chat_id=chat_id,
+            message_id=message_id,
+            reaction_key=str(item["key"]),
+            reaction_type=str(item["kind"]),
+            total_count=int(item["total"]),
+            data_mode="aggregate_anonymous",
+            telegram_date=telegram_date,
+            total_reactions=int(stats["total_reactions"]),
+            reaction_kinds=int(stats["reaction_kinds"]),
+            dominant_reaction=str(stats["dominant_reaction"]),
+        )
+        snapshots.append(snapshot)
+    snapshot_lines = [_snapshot_summary_line(snapshot) for snapshot in snapshots]
+    snapshot_text = "\n".join(snapshot_lines) if snapshot_lines else "—"
+    _audit_info(
+        "reaction_snapshot_saved",
+        event_type="message_reaction_count",
+        chat_id=chat_id,
+        message_id=message_id,
+        total_reactions=stats["total_reactions"],
+        reaction_kinds=stats["reaction_kinds"],
+        dominant_reaction=stats["dominant_reaction"],
+        data_mode="aggregate_anonymous",
+    )
+
     title = _chat_title(update.chat)
     ref = (watch or {}).get("post_link") or _post_ref(update.chat, message_id)
     await _notify_owner(
@@ -658,20 +777,32 @@ async def reaction_count_handler(update: MessageReactionCountUpdated) -> None:
         f"Chat ID: <code>{chat_id}</code>\n"
         f"Post: <code>{message_id}</code>\n"
         f"Reações: <code>{html.escape(count_label)}</code>\n"
+        f"Total geral: <code>{stats['total_reactions']}</code>\n"
+        f"Tipos de reação: <code>{stats['reaction_kinds']}</code>\n"
+        f"Dominante: <code>{html.escape(str(stats['dominant_reaction']))}</code>\n"
+        f"Variação desde o snapshot anterior:\n{snapshot_text}\n"
+        f"Modo do dado: <code>aggregate_anonymous</code>\n"
         f"Evento: <code>message_reaction_count</code>\n"
         f"Ref: <code>{html.escape(str(ref))}</code>\n"
-        f"Horário: <code>{html.escape(_now_label())}</code>\n\n"
+        f"Horário Telegram: <code>{html.escape(str(telegram_date or '—'))}</code>\n"
+        f"Horário local: <code>{html.escape(_now_label())}</code>\n\n"
         "Observação: em canal broadcast isso pode vir agregado/anônimo e com atraso do Telegram.",
         event_type="message_reaction_count",
         chat_id=chat_id,
         message_id=message_id,
     )
 
+
+
     _audit_info(
         "message_reaction_count_handled",
         chat_id=chat_id,
         message_id=message_id,
         reactions=count_label,
+        total_reactions=stats["total_reactions"],
+        reaction_kinds=stats["reaction_kinds"],
+        dominant_reaction=stats["dominant_reaction"],
+        data_mode="aggregate_anonymous",
     )
 
 
@@ -780,6 +911,213 @@ async def reaction_watch_list_command(message: Message) -> None:
     await message.answer("<b>Posts observados</b>\n\n" + "\n".join(lines))
 
 
+
+
+async def _format_snapshot_probe(database_path: str, chat_id: int, message_id: int) -> str:
+    snapshots = await latest_reaction_snapshots(database_path, chat_id, message_id)
+    event_count = await reaction_event_count(database_path, chat_id, message_id)
+    if not snapshots:
+        return (
+            "<b>Estatística por snapshot</b>\n"
+            "— ainda não há snapshot de contagem para este post. "
+            "Ele será criado quando o Telegram entregar <code>message_reaction_count</code>."
+        )
+
+    total = max(int(s.get("total_reactions") or 0) for s in snapshots)
+    kinds = max(int(s.get("reaction_kinds") or 0) for s in snapshots)
+    dominant = next((str(s.get("dominant_reaction")) for s in snapshots if s.get("dominant_reaction")), "—")
+    last_at = max(str(s.get("captured_at") or "") for s in snapshots)
+    mode = snapshots[0].get("data_mode") or "aggregate_anonymous"
+    lines = [_snapshot_summary_line(snapshot) for snapshot in snapshots]
+    return (
+        "<b>Estatística por snapshot</b>\n"
+        f"modo do dado: <code>{html.escape(str(mode))}</code>\n"
+        f"total geral: <code>{total}</code> · tipos: <code>{kinds}</code> · dominante: <code>{html.escape(dominant)}</code>\n"
+        f"eventos salvos: <code>{event_count}</code> · último snapshot: <code>{html.escape(last_at or '—')}</code>\n"
+        + "\n".join(f"• {line}" for line in lines)
+    )
+
+
+def _latest_post_totals(rows: list[dict[str, Any]]) -> dict[tuple[int, int], dict[str, Any]]:
+    latest_by_key: dict[tuple[int, int, str], dict[str, Any]] = {}
+    for row in rows:
+        key = (int(row["chat_id"]), int(row["message_id"]), str(row["reaction_key"]))
+        if key not in latest_by_key or int(row["id"]) > int(latest_by_key[key]["id"]):
+            latest_by_key[key] = row
+
+    posts: dict[tuple[int, int], dict[str, Any]] = {}
+    for row in latest_by_key.values():
+        post_key = (int(row["chat_id"]), int(row["message_id"]))
+        item = posts.setdefault(
+            post_key,
+            {
+                "chat_id": int(row["chat_id"]),
+                "message_id": int(row["message_id"]),
+                "channel_title": row.get("channel_title") or str(row["chat_id"]),
+                "post_link": row.get("post_link") or f"channel:{row['chat_id']}/{row['message_id']}",
+                "total": 0,
+                "positive_delta": 0,
+                "last_at": row.get("captured_at") or "",
+                "dominant": row.get("dominant_reaction") or "—",
+            },
+        )
+        item["total"] += int(row.get("total_count") or 0)
+        delta = row.get("delta_count")
+        if delta is not None and int(delta) > 0:
+            item["positive_delta"] += int(delta)
+        if str(row.get("captured_at") or "") > str(item.get("last_at") or ""):
+            item["last_at"] = row.get("captured_at") or ""
+            item["dominant"] = row.get("dominant_reaction") or item.get("dominant") or "—"
+    return posts
+
+
+@router.message(Command("preactpost"))
+async def reaction_post_stats_command(message: Message) -> None:
+    """Mostra diagnóstico estatístico de um post observado."""
+    if await _ignore_if_not_owner_dm(message):
+        return
+
+    raw_ref = _command_payload(message.text or "")
+    if not raw_ref:
+        await message.answer(
+            "<b>Estatística de post</b>\n\n"
+            "Uso: <code>/preactpost https://t.me/nomedocanal/123</code>"
+        )
+        return
+
+    chat_id, message_id, _, _, _, attempt_lines = await _resolve_post_ref(message, raw_ref)
+    if chat_id is None or message_id is None:
+        await message.answer(
+            "<b>Estatística de post</b>\n\n"
+            + "\n".join(f"• {line}" for line in attempt_lines)
+            + "\n\nNão consegui resolver o post."
+        )
+        return
+
+    settings = get_settings()
+    watch = await get_reaction_watch(settings.database_path, chat_id, message_id)
+    stats = await _format_snapshot_probe(settings.database_path, chat_id, message_id)
+    title = html.escape((watch or {}).get("channel_title") or str(chat_id))
+    ref = html.escape((watch or {}).get("post_link") or raw_ref)
+    source = html.escape(str((watch or {}).get("source") or "—"))
+    await message.answer(
+        "<b>Estatística de reação do post</b>\n\n"
+        f"Canal: <b>{title}</b>\n"
+        f"Chat ID: <code>{chat_id}</code>\n"
+        f"Post: <code>{message_id}</code>\n"
+        f"Origem: <code>{source}</code>\n"
+        f"Ref: <code>{ref}</code>\n\n"
+        + stats
+    )
+
+
+@router.message(Command("preacttop"))
+async def reaction_top_command(message: Message) -> None:
+    """Lista posts com mais reações, com base no último snapshot de cada reação."""
+    if await _ignore_if_not_owner_dm(message):
+        return
+
+    settings = get_settings()
+    rows = await list_recent_reaction_snapshots(settings.database_path, limit=800)
+    posts = sorted(_latest_post_totals(rows).values(), key=lambda row: int(row["total"]), reverse=True)[:10]
+    if not posts:
+        await message.answer("<b>Top reações</b>\n\nNenhum snapshot salvo ainda.")
+        return
+
+    lines = []
+    for idx, item in enumerate(posts, start=1):
+        title = html.escape(str(item.get("channel_title") or item["chat_id"]))
+        ref = html.escape(str(item.get("post_link") or ""))
+        lines.append(
+            f"{idx}. {title} · post <code>{item['message_id']}</code> · "
+            f"total: <code>{item['total']}</code> · dominante: <code>{html.escape(str(item.get('dominant') or '—'))}</code>\n"
+            f"   <code>{ref}</code>"
+        )
+    await message.answer("<b>Top reações por post</b>\n\n" + "\n".join(lines))
+
+
+@router.message(Command("preactfast"))
+async def reaction_fast_command(message: Message) -> None:
+    """Lista posts com maior delta positivo recente registrado nos snapshots."""
+    if await _ignore_if_not_owner_dm(message):
+        return
+
+    settings = get_settings()
+    rows = await list_recent_reaction_snapshots(settings.database_path, limit=800)
+    posts = sorted(
+        (item for item in _latest_post_totals(rows).values() if int(item.get("positive_delta") or 0) > 0),
+        key=lambda row: int(row["positive_delta"]),
+        reverse=True,
+    )[:10]
+    if not posts:
+        await message.answer("<b>Posts em aceleração</b>\n\nAinda não há delta positivo calculado. Ele aparece a partir do segundo snapshot de um post.")
+        return
+
+    lines = []
+    for idx, item in enumerate(posts, start=1):
+        title = html.escape(str(item.get("channel_title") or item["chat_id"]))
+        ref = html.escape(str(item.get("post_link") or ""))
+        lines.append(
+            f"{idx}. {title} · post <code>{item['message_id']}</code> · "
+            f"delta recente: <code>+{item['positive_delta']}</code> · total: <code>{item['total']}</code>\n"
+            f"   <code>{ref}</code>"
+        )
+    await message.answer("<b>Posts em aceleração</b>\n\n" + "\n".join(lines))
+
+
+@router.message(Command("preactresumo"))
+async def reaction_summary_command(message: Message) -> None:
+    """Resumo compacto de snapshots de reação para a DM do dono."""
+    if await _ignore_if_not_owner_dm(message):
+        return
+
+    settings = get_settings()
+    rows = await list_recent_reaction_snapshots(settings.database_path, limit=1000)
+    posts = _latest_post_totals(rows)
+    if not posts:
+        await message.answer("<b>Resumo de reações</b>\n\nNenhum snapshot salvo ainda.")
+        return
+
+    total_posts = len(posts)
+    total_reactions = sum(int(item.get("total") or 0) for item in posts.values())
+    best = max(posts.values(), key=lambda item: int(item.get("total") or 0))
+    fastest = max(posts.values(), key=lambda item: int(item.get("positive_delta") or 0))
+    await message.answer(
+        "<b>Resumo de reações</b>\n\n"
+        f"Posts com snapshot: <code>{total_posts}</code>\n"
+        f"Total atual somado: <code>{total_reactions}</code>\n"
+        f"Melhor post: <code>{best['message_id']}</code> · total <code>{best['total']}</code>\n"
+        f"Maior delta recente: post <code>{fastest['message_id']}</code> · "
+        f"<code>+{fastest.get('positive_delta') or 0}</code>\n"
+        "Modo predominante: <code>aggregate_anonymous</code> quando o Telegram entrega contagem de canal."
+    )
+
+
+@router.message(Command("preactcsv"))
+async def reaction_csv_command(message: Message) -> None:
+    """Exporta snapshots recentes em CSV textual na DM do dono."""
+    if await _ignore_if_not_owner_dm(message):
+        return
+
+    settings = get_settings()
+    rows = await list_recent_reaction_snapshots(settings.database_path, limit=200)
+    if not rows:
+        await message.answer("<b>CSV de reações</b>\n\nNenhum snapshot salvo ainda.")
+        return
+
+    header = [
+        "chat_id", "message_id", "channel_title", "reaction_key", "reaction_type",
+        "total_count", "previous_count", "delta_count", "total_reactions",
+        "reaction_kinds", "dominant_reaction", "data_mode", "telegram_date", "captured_at", "post_link",
+    ]
+    lines = [",".join(header)]
+    for row in rows[:120]:
+        lines.append(",".join(_snapshot_csv_value(row.get(col)) for col in header))
+    csv_text = "\n".join(lines)
+    if len(csv_text) > 3500:
+        csv_text = csv_text[:3500] + "\n...cortado para caber na mensagem"
+    await message.answer("<b>CSV de snapshots recentes</b>\n\n<pre>" + html.escape(csv_text) + "</pre>")
+
 @router.message(Command("preact"))
 async def reaction_probe_command(message: Message) -> None:
     """Diagnostica e tenta o máximo permitido pelo Bot API para um link de post."""
@@ -808,11 +1146,16 @@ async def reaction_probe_command(message: Message) -> None:
     settings = get_settings()
     if chat_id is not None:
         persisted = await _format_persisted_probe(settings.database_path, chat_id, message_id)
+        snapshots = await _format_snapshot_probe(settings.database_path, chat_id, message_id)
         cached = _format_cached_probe(chat_id, message_id)
     else:
         persisted = (
             "<b>Watchlist persistente</b>\n"
             "— não consegui resolver o canal, então não deu para consultar por chat_id"
+        )
+        snapshots = (
+            "<b>Estatística por snapshot</b>\n"
+            "— não consegui resolver o canal, então não deu para cruzar snapshots por chat_id"
         )
         cached = (
             "<b>Cache em memória</b>\n"
@@ -825,6 +1168,8 @@ async def reaction_probe_command(message: Message) -> None:
         + "\n".join(f"• {line}" for line in attempt_lines)
         + "\n\n"
         + persisted
+        + "\n\n"
+        + snapshots
         + "\n\n"
         + cached
         + "\n\n"
