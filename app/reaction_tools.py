@@ -232,6 +232,8 @@ def _snapshot_summary_line(snapshot: dict[str, Any]) -> str:
     reaction_key = str(snapshot.get("reaction_key") or "")
     if reaction_key.startswith("emoji:"):
         label = reaction_key.split(":", 1)[1]
+    elif reaction_key == "aggregate:unknown":
+        label = "agregado sem emoji"
     return f"{html.escape(label)}: <code>{html.escape(_delta_label(snapshot))}</code>"
 
 
@@ -1545,6 +1547,26 @@ def _dump_count_values(data: dict[str, Any]) -> dict[str, Any]:
     return {"attribute_counts": attribute_counts, **_dump_extra_metrics(data)}
 
 
+def _dump_aggregate_count_from_attributes(data: dict[str, Any]) -> int | None:
+    """Fallback para dumps do cliente Telegram/iOS sem bloco `reactions`.
+
+    Alguns dumps exportados pelo app não expõem `reactions.results`, mas colocam
+    contadores sociais genéricos em `attributes`, por exemplo:
+    `[{"signature": "..."}, {"count": 7}, {"count": 0}, ...]`.
+
+    A regra é deliberadamente conservadora: só olha `attributes` do objeto raiz,
+    ignora qualquer `count` aninhado em mídia/thumbnail/fileReference e usa o
+    primeiro contador positivo. Sem emoji/lista, o dado é salvo como agregado
+    sem discriminação de tipo.
+    """
+    counts = _dump_count_values(data).get("attribute_counts") or []
+    for count in counts:
+        number = _safe_int(count)
+        if number is not None and number > 0:
+            return number
+    return None
+
+
 _MAX_DUMP_FILE_BYTES = 5 * 1024 * 1024
 _ALLOWED_DUMP_EXTENSIONS = {".json", ".txt"}
 _ALLOWED_DUMP_MIME_TYPES = {"application/json", "text/plain", "text/json"}
@@ -1633,7 +1655,22 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
 
     items, source_format, reaction_container = _dump_reaction_items(data)
     stats = _reaction_stats_from_items(items)
-    reaction_label = " · ".join(f"{item['label']}: {item['total']}" for item in items) or "—"
+    aggregate_attribute_total = None
+    if not items:
+        aggregate_attribute_total = _dump_aggregate_count_from_attributes(data)
+        if aggregate_attribute_total is not None:
+            source_format = source_format or "telegram_client_root_attributes"
+            stats = {
+                "total_reactions": int(aggregate_attribute_total),
+                "reaction_kinds": 0,
+                "dominant_reaction": "—",
+            }
+    if items:
+        reaction_label = " · ".join(f"{item['label']}: {item['total']}" for item in items)
+    elif aggregate_attribute_total is not None:
+        reaction_label = f"agregado sem emoji: {aggregate_attribute_total}"
+    else:
+        reaction_label = "—"
 
     can_view_list = _dump_bool_from_container(
         reaction_container,
@@ -1680,6 +1717,8 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
 
     if can_view_list is True:
         data_mode = "list_available"
+    elif aggregate_attribute_total is not None:
+        data_mode = "aggregate_count_only"
     elif can_view_list is False:
         data_mode = "aggregate_anonymous"
     else:
@@ -1695,7 +1734,7 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
         f"{match['path']}={match['summary']}" for match in reaction_probe_paths[:12]
     ]
 
-    if not items:
+    if not items and aggregate_attribute_total is None:
         _audit_warning(
             "preactdeep_dump_no_reactions_found",
             chat_id=chat_id,
@@ -1703,6 +1742,15 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
             source_format=source_format or "-",
             probe_matches=len(reaction_probe_paths),
             probe_preview=" | ".join(reaction_probe_summary[:6]) or "-",
+        )
+    elif not items and aggregate_attribute_total is not None:
+        _audit_info(
+            "preactdeep_dump_attribute_count_found",
+            chat_id=chat_id,
+            message_id=message_id,
+            total_reactions=aggregate_attribute_total,
+            source_format=source_format or "telegram_client_root_attributes",
+            raw_counts=_dump_count_values(data).get("attribute_counts"),
         )
 
     return {
@@ -1720,6 +1768,7 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
         "paid_reactors_count": paid_reactors_count,
         "are_tags": are_tags,
         "reaction_items": items,
+        "aggregate_attribute_total": aggregate_attribute_total,
         "reaction_label": reaction_label,
         "total_reactions": int(stats["total_reactions"]),
         "reaction_kinds": int(stats["reaction_kinds"]),
@@ -1798,12 +1847,19 @@ def _format_deep_result(analysis: dict[str, Any], *, saved_snapshot_lines: list[
 
     no_reactions_note = ""
     if int(analysis.get("reaction_kinds") or 0) == 0:
-        no_reactions_note = (
-            "\n<b>Aviso</b>\n"
-            "não encontrei bloco de reações compatível neste dump; salvei os metadados disponíveis e mantive o diagnóstico local.\n"
-            "Se a varredura recursiva abaixo vier zerada, o arquivo provavelmente não contém bloco de reações. "
-            "Se vier com caminhos candidatos, o dump usa um formato novo para mapear.\n"
-        )
+        if int(analysis.get("total_reactions") or 0) > 0 and analysis.get("data_mode") == "aggregate_count_only":
+            no_reactions_note = (
+                "\n<b>Aviso</b>\n"
+                "este dump não trouxe emoji nem usuários, mas trouxe contador agregado em <code>attributes[].count</code>. "
+                "Salvei o total como <code>aggregate_count_only</code>.\n"
+            )
+        else:
+            no_reactions_note = (
+                "\n<b>Aviso</b>\n"
+                "não encontrei bloco de reações compatível neste dump; salvei os metadados disponíveis e mantive o diagnóstico local.\n"
+                "Se a varredura recursiva abaixo vier zerada, o arquivo provavelmente não contém bloco de reações. "
+                "Se vier com caminhos candidatos, o dump usa um formato novo para mapear.\n"
+            )
     return (
         "<b>Diagnóstico deep de reações</b>\n\n"
         f"Canal: <b>{title}</b> · <code>{username_line}</code>\n"
@@ -2074,6 +2130,22 @@ async def reaction_deep_command(message: Message) -> None:
                 total_reactions=int(analysis.get("total_reactions") or 0),
                 reaction_kinds=int(analysis.get("reaction_kinds") or 0),
                 dominant_reaction=str(analysis.get("dominant_reaction") or "—"),
+            )
+            snapshot_lines.append("• " + _snapshot_summary_line(snapshot))
+
+        if not snapshot_lines and str(analysis.get("data_mode") or "") == "aggregate_count_only" and int(analysis.get("total_reactions") or 0) > 0:
+            snapshot = await record_reaction_snapshot(
+                settings.database_path,
+                chat_id=int(analysis["chat_id"]),
+                message_id=int(analysis["message_id"]),
+                reaction_key="aggregate:unknown",
+                reaction_type="aggregate_count_only",
+                total_count=int(analysis.get("total_reactions") or 0),
+                data_mode="aggregate_count_only",
+                telegram_date=None,
+                total_reactions=int(analysis.get("total_reactions") or 0),
+                reaction_kinds=0,
+                dominant_reaction="—",
             )
             snapshot_lines.append("• " + _snapshot_summary_line(snapshot))
 
