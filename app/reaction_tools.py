@@ -1540,31 +1540,46 @@ def _dump_content_type(data: dict[str, Any]) -> str:
 def _dump_count_values(data: dict[str, Any]) -> dict[str, Any]:
     attribute_counts: list[int] = []
     for attr in _dump_attributes(data):
-        if isinstance(attr, dict) and "count" in attr:
+        if isinstance(attr, dict) and "count" in attr and "reactions" not in attr:
             number = _safe_int(attr.get("count"))
             if number is not None:
                 attribute_counts.append(number)
-    return {"attribute_counts": attribute_counts, **_dump_extra_metrics(data)}
+
+    metrics = _dump_extra_metrics(data)
+    # Dumps do cliente Telegram/iOS podem serializar os campos MTProto views/forwards
+    # como atributos genéricos {count: N}. Quando houver bloco `reactions`, ele é a
+    # fonte principal de reactions; os counts soltos ficam como candidatos de interação.
+    if metrics.get("view_count") is None and attribute_counts:
+        metrics["possible_view_count"] = attribute_counts[0]
+        metrics["possible_view_source"] = "root_attribute_count_candidate"
+    else:
+        metrics["possible_view_count"] = metrics.get("view_count")
+        metrics["possible_view_source"] = "explicit_interaction_info" if metrics.get("view_count") is not None else None
+
+    if metrics.get("forward_count") is None and len(attribute_counts) > 1:
+        metrics["possible_forward_count"] = attribute_counts[1]
+        metrics["possible_forward_source"] = "root_attribute_count_candidate"
+    else:
+        metrics["possible_forward_count"] = metrics.get("forward_count")
+        metrics["possible_forward_source"] = "explicit_interaction_info" if metrics.get("forward_count") is not None else None
+
+    metrics["root_count_confidence"] = (
+        "candidate_pending_mtproto_confirmation" if attribute_counts else "not_available"
+    )
+    return {"attribute_counts": attribute_counts, **metrics}
 
 
-def _dump_aggregate_count_from_attributes(data: dict[str, Any]) -> int | None:
-    """Fallback para dumps do cliente Telegram/iOS sem bloco `reactions`.
+def _dump_untyped_root_counts(data: dict[str, Any]) -> list[int]:
+    """Counts soltos da raiz do dump, sem tratá-los como reactions confirmadas.
 
-    Alguns dumps exportados pelo app não expõem `reactions.results`, mas colocam
-    contadores sociais genéricos em `attributes`, por exemplo:
-    `[{"signature": "..."}, {"count": 7}, {"count": 0}, ...]`.
-
-    A regra é deliberadamente conservadora: só olha `attributes` do objeto raiz,
-    ignora qualquer `count` aninhado em mídia/thumbnail/fileReference e usa o
-    primeiro contador positivo. Sem emoji/lista, o dado é salvo como agregado
-    sem discriminação de tipo.
+    No Telegram/MTProto views, forwards e reactions são campos separados. Em dumps
+    do cliente iOS alguns campos podem aparecer como atributos genéricos
+    `{count: N}`. Eles devem ser preservados como candidatos de views/forwards,
+    mas não devem inflar `total_reactions` quando não há bloco explícito
+    `reactions` ou evento `message_reaction_count`.
     """
     counts = _dump_count_values(data).get("attribute_counts") or []
-    for count in counts:
-        number = _safe_int(count)
-        if number is not None and number > 0:
-            return number
-    return None
+    return [int(c) for c in counts if _safe_int(c) is not None]
 
 
 _MAX_DUMP_FILE_BYTES = 5 * 1024 * 1024
@@ -1655,20 +1670,11 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
 
     items, source_format, reaction_container = _dump_reaction_items(data)
     stats = _reaction_stats_from_items(items)
-    aggregate_attribute_total = None
-    if not items:
-        aggregate_attribute_total = _dump_aggregate_count_from_attributes(data)
-        if aggregate_attribute_total is not None:
-            source_format = source_format or "telegram_client_root_attributes"
-            stats = {
-                "total_reactions": int(aggregate_attribute_total),
-                "reaction_kinds": 0,
-                "dominant_reaction": "—",
-            }
+    root_counts = _dump_untyped_root_counts(data)
+    if not items and root_counts:
+        source_format = source_format or "telegram_client_root_counts_untyped"
     if items:
         reaction_label = " · ".join(f"{item['label']}: {item['total']}" for item in items)
-    elif aggregate_attribute_total is not None:
-        reaction_label = f"agregado sem emoji: {aggregate_attribute_total}"
     else:
         reaction_label = "—"
 
@@ -1717,12 +1723,14 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
 
     if can_view_list is True:
         data_mode = "list_available"
-    elif aggregate_attribute_total is not None:
-        data_mode = "aggregate_count_only"
-    elif can_view_list is False:
+    elif items and can_view_list is False:
         data_mode = "aggregate_anonymous"
+    elif items:
+        data_mode = "aggregate_or_unknown"
+    elif root_counts:
+        data_mode = "root_counts_untyped"
     else:
-        data_mode = "unknown_no_list_flag" if not items else "aggregate_or_unknown"
+        data_mode = "unknown_no_list_flag"
 
     post_link = f"https://t.me/{username}/{message_id}" if username and message_id else None
 
@@ -1734,7 +1742,8 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
         f"{match['path']}={match['summary']}" for match in reaction_probe_paths[:12]
     ]
 
-    if not items and aggregate_attribute_total is None:
+    count_values = _dump_count_values(data)
+    if not items and not root_counts:
         _audit_warning(
             "preactdeep_dump_no_reactions_found",
             chat_id=chat_id,
@@ -1743,14 +1752,26 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
             probe_matches=len(reaction_probe_paths),
             probe_preview=" | ".join(reaction_probe_summary[:6]) or "-",
         )
-    elif not items and aggregate_attribute_total is not None:
+    elif not items and root_counts:
         _audit_info(
-            "preactdeep_dump_attribute_count_found",
+            "preactdeep_dump_root_counts_found",
             chat_id=chat_id,
             message_id=message_id,
-            total_reactions=aggregate_attribute_total,
-            source_format=source_format or "telegram_client_root_attributes",
-            raw_counts=_dump_count_values(data).get("attribute_counts"),
+            possible_views=count_values.get("possible_view_count"),
+            possible_forwards=count_values.get("possible_forward_count"),
+            source_format=source_format or "telegram_client_root_counts_untyped",
+            raw_counts=count_values.get("attribute_counts"),
+        )
+    elif items and root_counts:
+        _audit_info(
+            "preactdeep_dump_reactions_and_counts_found",
+            chat_id=chat_id,
+            message_id=message_id,
+            total_reactions=stats["total_reactions"],
+            possible_views=count_values.get("possible_view_count"),
+            possible_forwards=count_values.get("possible_forward_count"),
+            source_format=source_format or "telegram_client_attribute_reactions",
+            raw_counts=count_values.get("attribute_counts"),
         )
 
     return {
@@ -1768,13 +1789,13 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
         "paid_reactors_count": paid_reactors_count,
         "are_tags": are_tags,
         "reaction_items": items,
-        "aggregate_attribute_total": aggregate_attribute_total,
+        "root_counts": root_counts,
         "reaction_label": reaction_label,
         "total_reactions": int(stats["total_reactions"]),
         "reaction_kinds": int(stats["reaction_kinds"]),
         "dominant_reaction": str(stats["dominant_reaction"]),
         "data_mode": data_mode,
-        "raw_count_values": _dump_count_values(data),
+        "raw_count_values": count_values,
         "stable_id": data.get("stableId"),
         "stable_version": data.get("stableVersion"),
         "source_format": source_format or "unknown",
@@ -1822,11 +1843,19 @@ def _format_deep_result(analysis: dict[str, Any], *, saved_snapshot_lines: list[
     db_text = ("\n\n" + db_block) if db_block else ""
     extra = analysis.get("extra_metrics") or {}
     source_format = html.escape(str(analysis.get("source_format") or "unknown"))
+    views_display = extra.get("view_count") if extra.get("view_count") is not None else extra.get("possible_view_count")
+    forwards_display = extra.get("forward_count") if extra.get("forward_count") is not None else extra.get("possible_forward_count")
+    views_source = extra.get("possible_view_source") or "—"
+    forwards_source = extra.get("possible_forward_source") or "—"
+    root_counts_display = analysis.get("raw_count_values", {}).get("attribute_counts") if isinstance(analysis.get("raw_count_values"), dict) else None
     extra_metrics_line = (
         f"formato detectado: <code>{source_format}</code>\n"
-        f"views: <code>{extra.get('view_count') if extra.get('view_count') is not None else '—'}</code> · "
-        f"forwards: <code>{extra.get('forward_count') if extra.get('forward_count') is not None else '—'}</code> · "
+        f"views/candidato: <code>{views_display if views_display is not None else '—'}</code> "
+        f"(<code>{html.escape(str(views_source))}</code>) · "
+        f"forwards/candidato: <code>{forwards_display if forwards_display is not None else '—'}</code> "
+        f"(<code>{html.escape(str(forwards_source))}</code>) · "
         f"replies: <code>{extra.get('reply_count') if extra.get('reply_count') is not None else '—'}</code>\n"
+        f"counts raiz: <code>{html.escape(str(root_counts_display or []))}</code>\n"
     )
     probe_summary = analysis.get("probe_summary") or []
     probe_text = ""
@@ -1847,11 +1876,11 @@ def _format_deep_result(analysis: dict[str, Any], *, saved_snapshot_lines: list[
 
     no_reactions_note = ""
     if int(analysis.get("reaction_kinds") or 0) == 0:
-        if int(analysis.get("total_reactions") or 0) > 0 and analysis.get("data_mode") == "aggregate_count_only":
+        if analysis.get("data_mode") == "root_counts_untyped":
             no_reactions_note = (
                 "\n<b>Aviso</b>\n"
-                "este dump não trouxe emoji nem usuários, mas trouxe contador agregado em <code>attributes[].count</code>. "
-                "Salvei o total como <code>aggregate_count_only</code>.\n"
+                "não encontrei emoji/lista de reactions neste dump. Os <code>attributes[].count</code> foram salvos como "
+                "candidatos de views/forwards, pendentes de confirmação por MTProto; não foram somados como reactions.\n"
             )
         else:
             no_reactions_note = (
@@ -2133,21 +2162,7 @@ async def reaction_deep_command(message: Message) -> None:
             )
             snapshot_lines.append("• " + _snapshot_summary_line(snapshot))
 
-        if not snapshot_lines and str(analysis.get("data_mode") or "") == "aggregate_count_only" and int(analysis.get("total_reactions") or 0) > 0:
-            snapshot = await record_reaction_snapshot(
-                settings.database_path,
-                chat_id=int(analysis["chat_id"]),
-                message_id=int(analysis["message_id"]),
-                reaction_key="aggregate:unknown",
-                reaction_type="aggregate_count_only",
-                total_count=int(analysis.get("total_reactions") or 0),
-                data_mode="aggregate_count_only",
-                telegram_date=None,
-                total_reactions=int(analysis.get("total_reactions") or 0),
-                reaction_kinds=0,
-                dominant_reaction="—",
-            )
-            snapshot_lines.append("• " + _snapshot_summary_line(snapshot))
+        # Counts soltos da raiz do dump são candidatos de views/forwards, não snapshots de reaction.
 
         _audit_info(
             "preactdeep_dump_saved",
