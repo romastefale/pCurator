@@ -195,8 +195,7 @@ CREATE TABLE IF NOT EXISTS reaction_post_metadata (
 CREATE INDEX IF NOT EXISTS idx_reaction_post_metadata_post
 ON reaction_post_metadata(chat_id, message_id, id);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_reaction_post_metadata_dump_hash
-ON reaction_post_metadata(chat_id, message_id, source, dump_hash)
-WHERE dump_hash IS NOT NULL;
+-- O índice único por dump_hash depende de colunas adicionadas por migração em bases antigas.
+-- Ele é criado em app/storage/migrations.py depois dos ALTER TABLE necessários.
 
 """
