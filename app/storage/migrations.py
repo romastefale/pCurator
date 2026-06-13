@@ -170,8 +170,42 @@ async def apply_migrations(database_path: str) -> None:
             )
             """
         )
+        reaction_post_metadata_columns = await _columns(db, "reaction_post_metadata")
+        for column_name, column_type in {
+            "possible_view_count": "INTEGER",
+            "possible_forward_count": "INTEGER",
+            "raw_attribute_counts_json": "TEXT",
+            "view_confidence": "TEXT",
+            "forward_confidence": "TEXT",
+            "stable_id": "INTEGER",
+            "stable_version": "INTEGER",
+            "source_format": "TEXT",
+            "dump_hash": "TEXT",
+        }.items():
+            if column_name not in reaction_post_metadata_columns:
+                await db.execute(f"ALTER TABLE reaction_post_metadata ADD COLUMN {column_name} {column_type}")
+
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_reaction_post_metadata_post ON reaction_post_metadata(chat_id, message_id, id)"
+        )
+        await db.execute(
+            """
+            DELETE FROM reaction_post_metadata
+            WHERE dump_hash IS NOT NULL
+              AND rowid NOT IN (
+                  SELECT MIN(rowid)
+                  FROM reaction_post_metadata
+                  WHERE dump_hash IS NOT NULL
+                  GROUP BY chat_id, message_id, source, dump_hash
+              )
+            """
+        )
+        await db.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_reaction_post_metadata_dump_hash
+            ON reaction_post_metadata(chat_id, message_id, source, dump_hash)
+            WHERE dump_hash IS NOT NULL
+            """
         )
 
         await db.commit()

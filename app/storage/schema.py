@@ -178,6 +178,15 @@ CREATE TABLE IF NOT EXISTS reaction_post_metadata (
     dump_reaction_kinds INTEGER,
     dump_dominant_reaction TEXT,
     dump_data_mode TEXT,
+    possible_view_count INTEGER,
+    possible_forward_count INTEGER,
+    raw_attribute_counts_json TEXT,
+    view_confidence TEXT,
+    forward_confidence TEXT,
+    stable_id INTEGER,
+    stable_version INTEGER,
+    source_format TEXT,
+    dump_hash TEXT,
     raw_count_values_json TEXT,
     source TEXT NOT NULL DEFAULT 'dump',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -185,5 +194,9 @@ CREATE TABLE IF NOT EXISTS reaction_post_metadata (
 
 CREATE INDEX IF NOT EXISTS idx_reaction_post_metadata_post
 ON reaction_post_metadata(chat_id, message_id, id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reaction_post_metadata_dump_hash
+ON reaction_post_metadata(chat_id, message_id, source, dump_hash)
+WHERE dump_hash IS NOT NULL;
 
 """

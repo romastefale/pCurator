@@ -1,3 +1,4 @@
+import hashlib
 import html
 import json
 import logging
@@ -119,6 +120,15 @@ def _json_value(raw: str | None, fallback: str = "—") -> str:
     if value is None:
         return fallback
     return str(value)
+
+
+def _json_load_or_none(raw: str | None) -> Any:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
 
 
 def _reaction_type_label(value: Any) -> str:
@@ -746,6 +756,33 @@ async def reaction_count_handler(update: MessageReactionCountUpdated) -> None:
     stats = _reaction_stats_from_items(items)
     telegram_date = _telegram_date_iso(getattr(update, "date", None))
     snapshots: list[dict[str, Any]] = []
+
+    # message_reaction_count representa o conjunto agregado atual. Se uma reação
+    # desapareceu do update atual, gravamos snapshot zero para impedir que
+    # consultas futuras mantenham uma reação antiga como se ainda estivesse ativa.
+    current_keys = {str(item["key"]) for item in items}
+    previous_snapshots = await latest_reaction_snapshots(settings.database_path, chat_id, message_id)
+    for previous in previous_snapshots:
+        previous_key = str(previous.get("reaction_key") or "")
+        if not previous_key or previous_key in current_keys:
+            continue
+        if int(previous.get("total_count") or 0) <= 0:
+            continue
+        snapshot = await record_reaction_snapshot(
+            settings.database_path,
+            chat_id=chat_id,
+            message_id=message_id,
+            reaction_key=previous_key,
+            reaction_type=str(previous.get("reaction_type") or "unknown"),
+            total_count=0,
+            data_mode="aggregate_anonymous",
+            telegram_date=telegram_date,
+            total_reactions=int(stats["total_reactions"]),
+            reaction_kinds=int(stats["reaction_kinds"]),
+            dominant_reaction=str(stats["dominant_reaction"]),
+        )
+        snapshots.append(snapshot)
+
     for item in items:
         snapshot = await record_reaction_snapshot(
             settings.database_path,
@@ -1645,13 +1682,17 @@ async def _read_dump_document_text(source_message: Message, *, bot: Any) -> str 
 
 
 def _parse_dump_payload(text: str) -> dict[str, Any]:
-    data = json.loads(_extract_json_candidate(text))
+    candidate = _extract_json_candidate(text)
+    data = json.loads(candidate)
     if isinstance(data, list):
         if len(data) != 1 or not isinstance(data[0], dict):
             raise ValueError("dump precisa ser um objeto JSON de mensagem ou lista com um objeto")
         data = data[0]
     if not isinstance(data, dict):
         raise ValueError("dump precisa ser um objeto JSON")
+
+    normalized_dump = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    dump_hash = hashlib.sha256(normalized_dump.encode("utf-8")).hexdigest()
 
     chat_id = _dump_chat_id(data)
     message_id = _dump_message_id(data)
@@ -1796,10 +1837,16 @@ def _parse_dump_payload(text: str) -> dict[str, Any]:
         "dominant_reaction": str(stats["dominant_reaction"]),
         "data_mode": data_mode,
         "raw_count_values": count_values,
+        "possible_view_count": count_values.get("possible_view_count"),
+        "possible_forward_count": count_values.get("possible_forward_count"),
+        "raw_attribute_counts": count_values.get("attribute_counts") or [],
+        "view_confidence": count_values.get("root_count_confidence") if count_values.get("possible_view_count") is not None else "not_available",
+        "forward_confidence": count_values.get("root_count_confidence") if count_values.get("possible_forward_count") is not None else "not_available",
         "stable_id": data.get("stableId"),
         "stable_version": data.get("stableVersion"),
         "source_format": source_format or "unknown",
-        "extra_metrics": _dump_extra_metrics(data),
+        "dump_hash": dump_hash,
+        "extra_metrics": count_values,
         "probe_matches": len(reaction_probe_paths),
         "probe_paths": reaction_probe_paths[:12],
         "probe_summary": reaction_probe_summary[:12],
@@ -1814,6 +1861,20 @@ def _metadata_bool_label(value: Any) -> str:
 def _format_metadata_block(metadata: dict[str, Any] | None) -> str:
     if not metadata:
         return "<b>Metadados deep salvos</b>\n— nenhum dump salvo para este post ainda"
+    raw_counts = _json_load_or_none(metadata.get("raw_attribute_counts_json"))
+    if raw_counts is None:
+        raw_values = _json_load_or_none(metadata.get("raw_count_values_json"))
+        raw_counts = raw_values.get("attribute_counts") if isinstance(raw_values, dict) else []
+    possible_views = metadata.get("possible_view_count")
+    possible_forwards = metadata.get("possible_forward_count")
+    view_confidence = metadata.get("view_confidence") or "—"
+    forward_confidence = metadata.get("forward_confidence") or "—"
+    stable_label = "—"
+    if metadata.get("stable_id") is not None or metadata.get("stable_version") is not None:
+        stable_label = f"{metadata.get('stable_id') or '—'} / v{metadata.get('stable_version') or '—'}"
+    dump_hash = str(metadata.get("dump_hash") or "—")
+    if len(dump_hash) > 16:
+        dump_hash = dump_hash[:16]
     return (
         "<b>Metadados deep salvos</b>\n"
         f"texto: <code>{html.escape(str(metadata.get('text_preview') or '—'))}</code>\n"
@@ -1823,6 +1884,13 @@ def _format_metadata_block(metadata: dict[str, Any] | None) -> str:
         f"recentPeers: <code>{metadata.get('dump_recent_peers_count') or 0}</code> · "
         f"topPeers: <code>{metadata.get('dump_top_peers_count') or 0}</code>\n"
         f"modo dump: <code>{html.escape(str(metadata.get('dump_data_mode') or '—'))}</code> · "
+        f"formato: <code>{html.escape(str(metadata.get('source_format') or '—'))}</code>\n"
+        f"views/candidato: <code>{possible_views if possible_views is not None else '—'}</code> "
+        f"(<code>{html.escape(str(view_confidence))}</code>) · "
+        f"forwards/candidato: <code>{possible_forwards if possible_forwards is not None else '—'}</code> "
+        f"(<code>{html.escape(str(forward_confidence))}</code>)\n"
+        f"counts raiz: <code>{html.escape(str(raw_counts or []))}</code>\n"
+        f"stable: <code>{html.escape(stable_label)}</code> · dump hash: <code>{html.escape(dump_hash)}</code>\n"
         f"último deep: <code>{html.escape(str(metadata.get('created_at') or '—'))}</code>"
     )
 
@@ -2067,6 +2135,85 @@ async def reaction_csv_command(message: Message) -> None:
     await message.answer("<b>CSV de snapshots recentes</b>\n\n<pre>" + html.escape(csv_text) + "</pre>")
 
 
+@router.message(Command("preactget"))
+async def reaction_get_command(message: Message) -> None:
+    """Consulta consolidada de um post já visto/salvo, sem depender do Railway log."""
+    if await _ignore_if_not_owner_dm(message):
+        return
+
+    raw_ref = _command_payload(message.text or "")
+    if not raw_ref:
+        await message.answer(
+            "<b>Consulta consolidada de reações</b>\n\n"
+            "Uso: <code>/preactget 125</code> ou <code>/preactget https://t.me/romastefale/125</code>"
+        )
+        return
+
+    settings = get_settings()
+    if raw_ref.isdigit():
+        matches = await find_reaction_posts_by_message_id(settings.database_path, int(raw_ref), limit=8)
+        if not matches:
+            await message.answer(
+                "<b>Consulta consolidada de reações</b>\n\n"
+                f"Não encontrei post <code>{html.escape(raw_ref)}</code> nos dados locais."
+            )
+            return
+        if len(matches) > 1:
+            lines = []
+            for item in matches:
+                title = html.escape(str(item.get("channel_title") or item.get("channel_username") or item["chat_id"]))
+                ref = html.escape(str(item.get("post_link") or f"channel:{item['chat_id']}/{item['message_id']}"))
+                lines.append(f"• {title} · <code>{ref}</code>")
+            await message.answer(
+                "<b>Consulta consolidada de reações</b>\n\n"
+                "Esse ID existe em mais de um contexto. Use uma destas refs:\n" + "\n".join(lines)
+            )
+            return
+        chat_id = int(matches[0]["chat_id"])
+        message_id = int(matches[0]["message_id"])
+        attempt_lines = [f"Post local: <code>{message_id}</code>", f"Chat ID: <code>{chat_id}</code>"]
+        raw_ref = str(matches[0].get("post_link") or f"channel:{chat_id}/{message_id}")
+    else:
+        chat_id, message_id, _, _, _, attempt_lines = await _resolve_post_ref(message, raw_ref)
+        if chat_id is None or message_id is None:
+            await message.answer(
+                "<b>Consulta consolidada de reações</b>\n\n"
+                + "\n".join(f"• {line}" for line in attempt_lines)
+                + "\n\nNão consegui resolver o post."
+            )
+            return
+
+    watch = await get_reaction_watch(settings.database_path, chat_id, message_id)
+    snapshots = await latest_reaction_snapshots(settings.database_path, chat_id, message_id)
+    metadata = await get_latest_reaction_post_metadata(settings.database_path, chat_id, message_id)
+    snapshot_block = await _format_snapshot_probe(settings.database_path, chat_id, message_id)
+    metadata_block = _format_metadata_block(metadata)
+    title = html.escape(str((watch or {}).get("channel_title") or (metadata or {}).get("channel_title") or chat_id))
+    ref = html.escape(str((watch or {}).get("post_link") or (metadata or {}).get("post_link") or raw_ref))
+    current_total = sum(int(row.get("total_count") or 0) for row in snapshots)
+    current_reactions = " · ".join(
+        _snapshot_summary_line(row) for row in snapshots if int(row.get("total_count") or 0) > 0
+    ) or "—"
+    await message.answer(
+        "<b>Consulta consolidada de reações</b>\n\n"
+        + "\n".join(f"• {line}" for line in attempt_lines)
+        + "\n\n"
+        f"Canal: <b>{title}</b>\n"
+        f"Chat ID: <code>{chat_id}</code>\n"
+        f"Post: <code>{message_id}</code>\n"
+        f"Ref: <code>{ref}</code>\n\n"
+        "<b>Estado atual por snapshots</b>\n"
+        f"reações ativas: {current_reactions}\n"
+        f"total ativo: <code>{current_total}</code>\n\n"
+        + snapshot_block
+        + "\n\n"
+        + metadata_block
+        + "\n\n<b>Regra de confiança</b>\n"
+        "<code>message_reaction_count</code> é a fonte mais forte para reação atual; "
+        "dump é evidência complementar; <code>attributes[].count</code> solto permanece como candidato de views/forwards."
+    )
+
+
 @router.message(Command("preactdeep"))
 async def reaction_deep_command(message: Message) -> None:
     """Diagnóstico profundo: link/id por banco ou dump JSON por reply/texto."""
@@ -2141,12 +2288,24 @@ async def reaction_deep_command(message: Message) -> None:
             dump_reaction_kinds=int(analysis.get("reaction_kinds") or 0),
             dump_dominant_reaction=str(analysis.get("dominant_reaction") or "—"),
             dump_data_mode=str(analysis.get("data_mode") or "aggregate_anonymous"),
+            possible_view_count=analysis.get("possible_view_count"),
+            possible_forward_count=analysis.get("possible_forward_count"),
+            raw_attribute_counts=analysis.get("raw_attribute_counts"),
+            view_confidence=analysis.get("view_confidence"),
+            forward_confidence=analysis.get("forward_confidence"),
+            stable_id=_safe_int(analysis.get("stable_id")),
+            stable_version=_safe_int(analysis.get("stable_version")),
+            source_format=str(analysis.get("source_format") or "unknown"),
+            dump_hash=str(analysis.get("dump_hash") or ""),
             raw_count_values=analysis.get("raw_count_values"),
             source="preactdeep_dump",
         )
 
         snapshot_lines: list[str] = []
-        for item in analysis.get("reaction_items") or []:
+        duplicate_dump = metadata.get("_upsert_action") == "existing"
+        if duplicate_dump:
+            snapshot_lines.append("— dump idêntico já estava salvo; snapshots não foram duplicados")
+        for item in ([] if duplicate_dump else (analysis.get("reaction_items") or [])):
             snapshot = await record_reaction_snapshot(
                 settings.database_path,
                 chat_id=int(analysis["chat_id"]),
@@ -2172,7 +2331,12 @@ async def reaction_deep_command(message: Message) -> None:
             reaction_kinds=analysis.get("reaction_kinds"),
             can_view_list=analysis.get("can_view_list"),
             source_format=analysis.get("source_format"),
+            possible_views=analysis.get("possible_view_count"),
+            possible_forwards=analysis.get("possible_forward_count"),
+            raw_counts=analysis.get("raw_attribute_counts"),
             metadata_id=metadata.get("id"),
+            metadata_action=metadata.get("_upsert_action"),
+            dump_hash=str(analysis.get("dump_hash") or "")[:16],
         )
         await message.answer(_format_deep_result(analysis, saved_snapshot_lines=snapshot_lines))
         return

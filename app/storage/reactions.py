@@ -309,11 +309,38 @@ async def record_reaction_post_metadata(
     dump_reaction_kinds: int | None = None,
     dump_dominant_reaction: str | None = None,
     dump_data_mode: str | None = None,
+    possible_view_count: int | None = None,
+    possible_forward_count: int | None = None,
+    raw_attribute_counts: Any = None,
+    view_confidence: str | None = None,
+    forward_confidence: str | None = None,
+    stable_id: int | None = None,
+    stable_version: int | None = None,
+    source_format: str | None = None,
+    dump_hash: str | None = None,
     raw_count_values: Any = None,
     source: str = "dump",
 ) -> dict:
     async with aiosqlite.connect(database_path) as db:
         db.row_factory = aiosqlite.Row
+
+        if dump_hash:
+            cursor = await db.execute(
+                """
+                SELECT *
+                FROM reaction_post_metadata
+                WHERE chat_id = ? AND message_id = ? AND source = ? AND dump_hash = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (chat_id, message_id, source, dump_hash),
+            )
+            existing = await cursor.fetchone()
+            if existing:
+                row = dict(existing)
+                row["_upsert_action"] = "existing"
+                return row
+
         await db.execute(
             """
             INSERT INTO reaction_post_metadata (
@@ -322,9 +349,12 @@ async def record_reaction_post_metadata(
                 dump_can_view_list, dump_recent_peers_count, dump_top_peers_count,
                 dump_paid_reactors_count, dump_are_tags, dump_reactions_json,
                 dump_total_reactions, dump_reaction_kinds, dump_dominant_reaction,
-                dump_data_mode, raw_count_values_json, source, created_at
+                dump_data_mode, possible_view_count, possible_forward_count,
+                raw_attribute_counts_json, view_confidence, forward_confidence,
+                stable_id, stable_version, source_format, dump_hash, raw_count_values_json,
+                source, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
             (
                 chat_id,
@@ -345,6 +375,15 @@ async def record_reaction_post_metadata(
                 dump_reaction_kinds,
                 dump_dominant_reaction,
                 dump_data_mode,
+                possible_view_count,
+                possible_forward_count,
+                _json_dumps(raw_attribute_counts),
+                view_confidence,
+                forward_confidence,
+                stable_id,
+                stable_version,
+                source_format,
+                dump_hash,
                 _json_dumps(raw_count_values),
                 source,
             ),
@@ -358,7 +397,9 @@ async def record_reaction_post_metadata(
             """
         )
         row = await cursor.fetchone()
-        return dict(row)
+        result = dict(row)
+        result["_upsert_action"] = "inserted"
+        return result
 
 
 async def get_latest_reaction_post_metadata(
