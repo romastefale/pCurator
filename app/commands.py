@@ -88,6 +88,7 @@ async def help_command(message: Message) -> None:
         "/pclab — hipóteses de canais por evidência do banco\n"
         "/pcmemoria — memória de canais usados/desativados\n"
         "/pcrecuperar [ID|todos] — testar e restaurar com o mesmo token\n"
+        "/pcrepost ID — prova direta send/delete sem depender de get_chat\n"
         "/adeus ID — sair de um canal pelo ID (só o dono)\n\n"
         "<b>Reações de posts</b>\n"
         "• Todo post de canal visto pelo bot admin entra em monitoramento automático.\n"
@@ -303,6 +304,47 @@ async def channel_recover_command(message: Message) -> None:
         f"Modo: <code>{html.escape(mode)}</code> · restaurados: <code>{restored}</code>/<code>{len(results)}</code>\n\n"
         + "\n\n".join(lines[:20])
     )
+
+
+
+
+@router.message(Command("pcrepost"))
+async def channel_recover_direct_post_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    parts = (message.text or "").split()
+    if len(parts) < 2:
+        await message.answer("Uso: <code>/pcrepost -1001234567890</code>")
+        return
+    try:
+        chat_id = int(parts[1])
+    except ValueError:
+        await message.answer("ID inválido. Use algo como <code>/pcrepost -1001234567890</code>.")
+        return
+
+    settings = get_settings()
+    results = await recover_channels(
+        message.bot,
+        settings.database_path,
+        env_chat_ids=_env_channel_ids(),
+        only_chat_id=chat_id,
+        active_probe=True,
+        limit=1,
+    )
+    if not results:
+        # Mesmo sem hipótese no banco, cria uma hipótese pura pelo chat_id informado.
+        from app.services.channel_recovery import ChannelCandidate, recover_candidate
+
+        result = await recover_candidate(
+            message.bot,
+            settings.database_path,
+            ChannelCandidate(chat_id=chat_id, sources={"manual:pcrepost"}, score=100),
+            active_probe=True,
+        )
+        results = [result]
+
+    await message.answer("<b>Prova direta por token</b>\n\n" + "\n\n".join(r.line() for r in results))
 
 
 @router.message(Command("adeus"))

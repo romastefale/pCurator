@@ -284,6 +284,87 @@ async def collect_channel_candidates(
     return items
 
 
+async def _active_post_restore_probe(
+    bot: Bot,
+    database_path: str,
+    candidate: ChannelCandidate,
+    result: RecoveryResult,
+    *,
+    previous_state: str,
+    previous_reason: str,
+) -> bool:
+    """Prova máxima: tenta publicar com o mesmo token no chat_id histórico.
+
+    Essa rotina roda mesmo quando get_chat/getChatMember falham. A hipótese do
+    usuário é testada de forma objetiva: se o token ainda reteve permissão real
+    de postagem no canal, send_message passa e o canal é reativado. Se falhar,
+    o banco guarda o erro como evidência, mas mantém a hipótese recuperável.
+    """
+    chat_id = candidate.chat_id
+    try:
+        sent = await bot.send_message(
+            chat_id=chat_id,
+            text="pCurator prova técnica de restauração — apagando automaticamente.",
+            disable_notification=True,
+        )
+        result.probe_message_id = sent.message_id
+        deleted = False
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=sent.message_id)
+            deleted = True
+        except TelegramAPIError as delete_exc:
+            logger.warning(
+                "channel_recovery_probe_delete_failed chat_id=%s message_id=%s err=%s",
+                chat_id,
+                sent.message_id,
+                type(delete_exc).__name__,
+            )
+        result.probe_deleted = deleted
+        await upsert_channel(
+            database_path,
+            chat_id=chat_id,
+            title=result.title or str(chat_id),
+            username=result.username,
+            access_state="restored_by_direct_token_post",
+            access_reason=(
+                f"send_message succeeded after {previous_state}; delete_probe={deleted}; "
+                f"previous={previous_reason}; evidence={candidate.evidence_label}"
+            ),
+            recovery_score=candidate.score,
+            recovery_evidence=json.dumps(result.sources, ensure_ascii=False),
+            bot_member_status=result.status,
+            can_post_messages=result.can_post_messages,
+            can_edit_messages=result.can_edit_messages,
+            can_delete_messages=result.can_delete_messages,
+            last_probe_message_id=sent.message_id,
+        )
+        result.ok = True
+        result.restored = True
+        result.state = "restored_by_direct_token_post"
+        result.reason = "o mesmo token conseguiu postar diretamente no chat_id histórico; canal restaurado"
+        return True
+    except TelegramAPIError as exc:
+        result.state = "direct_token_post_failed"
+        result.reason = (
+            f"send_message direto negado: {type(exc).__name__}: {exc}; "
+            f"passivo={previous_state}: {previous_reason}"
+        )
+        await update_channel_access_state(
+            database_path,
+            chat_id,
+            is_enabled=False,
+            state=result.state,
+            reason=result.reason,
+            recovery_score=candidate.score,
+            recovery_evidence=json.dumps(result.sources, ensure_ascii=False),
+            bot_member_status=result.status,
+            can_post_messages=result.can_post_messages,
+            can_edit_messages=result.can_edit_messages,
+            can_delete_messages=result.can_delete_messages,
+        )
+        return False
+
+
 async def recover_candidate(
     bot: Bot,
     database_path: str,
@@ -293,9 +374,10 @@ async def recover_candidate(
 ) -> RecoveryResult:
     """Testa uma hipótese de canal com o token atual.
 
-    active_probe=True faz uma prova forte: envia uma mensagem técnica silenciosa e
-    tenta apagá-la. Se o envio funciona, o canal é restaurado mesmo que algum
-    metadado passivo tenha vindo incompleto.
+    active_probe=True faz a prova mais forte primeiro quando a leitura passiva
+    falha: tenta publicar diretamente no chat_id histórico com o mesmo token.
+    Isso evita a falha anterior em que get_chat_failed encerrava o teste antes
+    da tentativa real de postagem.
     """
     chat_id = candidate.chat_id
     result = RecoveryResult(
@@ -321,6 +403,16 @@ async def recover_candidate(
     except TelegramAPIError as exc:
         result.state = "get_chat_failed"
         result.reason = f"get_chat negado: {type(exc).__name__}: {exc}"
+        if active_probe:
+            await _active_post_restore_probe(
+                bot,
+                database_path,
+                candidate,
+                result,
+                previous_state="get_chat_failed",
+                previous_reason=result.reason,
+            )
+            return result
         await update_channel_access_state(
             database_path,
             chat_id,
@@ -373,51 +465,15 @@ async def recover_candidate(
         result.reason = f"getChatMember negado: {type(exc).__name__}: {exc}"
 
     if active_probe:
-        try:
-            sent = await bot.send_message(
-                chat_id=chat_id,
-                text="pCurator prova técnica de restauração — apagando automaticamente.",
-                disable_notification=True,
-            )
-            result.probe_message_id = sent.message_id
-            deleted = False
-            try:
-                await bot.delete_message(chat_id=chat_id, message_id=sent.message_id)
-                deleted = True
-            except TelegramAPIError as delete_exc:
-                logger.warning(
-                    "channel_recovery_probe_delete_failed chat_id=%s message_id=%s err=%s",
-                    chat_id,
-                    sent.message_id,
-                    type(delete_exc).__name__,
-                )
-            result.probe_deleted = deleted
-            await upsert_channel(
-                database_path,
-                chat_id=chat_id,
-                title=result.title or str(chat_id),
-                username=result.username,
-                access_state="restored_by_active_post_probe",
-                access_reason=(
-                    f"send_message succeeded; delete_probe={deleted}; "
-                    f"previous={result.reason}; evidence={candidate.evidence_label}"
-                ),
-                recovery_score=candidate.score,
-                recovery_evidence=json.dumps(result.sources, ensure_ascii=False),
-                bot_member_status=result.status,
-                can_post_messages=result.can_post_messages,
-                can_edit_messages=result.can_edit_messages,
-                can_delete_messages=result.can_delete_messages,
-                last_probe_message_id=sent.message_id,
-            )
-            result.ok = True
-            result.restored = True
-            result.state = "restored_by_active_post_probe"
-            result.reason = "o mesmo token conseguiu postar no canal; canal restaurado no banco"
-            return result
-        except TelegramAPIError as exc:
-            result.state = "active_post_probe_failed"
-            result.reason = f"send_message negado: {type(exc).__name__}: {exc}; passivo: {result.reason}"
+        await _active_post_restore_probe(
+            bot,
+            database_path,
+            candidate,
+            result,
+            previous_state=result.state,
+            previous_reason=result.reason,
+        )
+        return result
 
     await update_channel_access_state(
         database_path,

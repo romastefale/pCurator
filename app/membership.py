@@ -13,7 +13,7 @@ from aiogram.enums import ChatMemberStatus
 from aiogram.types import ChatMemberUpdated
 
 from app.settings import get_settings
-from app.storage.channels import update_channel_access_state, upsert_channel
+from app.storage.channels import get_channel, update_channel_access_state, upsert_channel
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -79,15 +79,26 @@ async def on_my_chat_member(event: ChatMemberUpdated) -> None:
         logger.info("channel_registered chat_id=%s title=%s", chat.id, chat.title)
     else:
         reason = f"status={status_label}; can_post_messages={can_post}; update=my_chat_member"
+        channel = await get_channel(settings.database_path, chat.id)
+
+        # Depois de /adeus o Telegram pode entregar um my_chat_member=left
+        # atrasado. Esse update não deve apagar a hipótese nem transformar o
+        # canal em caso morto. Ele apenas entra em quarentena recuperável; o
+        # comando /pcrecuperar fará a prova direta send_message com o token.
+        state = "my_chat_member_left_recovery_queue" if status_label in {"left", "kicked"} else "my_chat_member_not_publishable"
+        is_enabled = False
+        if channel and channel.get("left_by_adeus") and status_label in {"left", "kicked"}:
+            state = "left_after_adeus_direct_token_required"
+
         await update_channel_access_state(
             settings.database_path,
             chat.id,
-            is_enabled=False,
-            state="my_chat_member_not_publishable",
-            reason=reason,
+            is_enabled=is_enabled,
+            state=state,
+            reason=reason + "; hipótese preservada para /pcrecuperar",
             bot_member_status=status_label,
             can_post_messages=can_post,
             can_edit_messages=can_edit,
             can_delete_messages=can_delete,
         )
-        logger.info("channel_disabled chat_id=%s reason=%s", chat.id, reason)
+        logger.info("channel_recovery_queue chat_id=%s state=%s reason=%s", chat.id, state, reason)
