@@ -14,6 +14,7 @@ from app.services.manual_discovery import (
 )
 from app.services.news_discovery import TOPIC_LABELS
 from app.services.preview import send_post_preview
+from app.services.channel_recovery import recover_channels
 from app.services.publisher import publish_post
 from app.services.regenerator import UNIFIED_TONE
 from app.services.review_delivery import generate_and_deliver_review
@@ -239,6 +240,13 @@ async def review_publish(callback: CallbackQuery) -> None:
         )
         return
 
+    await recover_channels(
+        callback.bot,
+        settings.database_path,
+        env_chat_ids=[settings.channel_1_id, settings.channel_2_id],
+        active_probe=False,
+        limit=50,
+    )
     channels = await list_channels(settings.database_path)
     if not channels:
         await callback.message.answer(
@@ -400,6 +408,14 @@ async def review_confirm(callback: CallbackQuery) -> None:
     channel_slug = button_destination
     post_id = button_post_id
 
+    await recover_channels(
+        callback.bot,
+        settings.database_path,
+        env_chat_ids=[settings.channel_1_id, settings.channel_2_id],
+        only_chat_id=int(channel_slug),
+        active_probe=False,
+        limit=1,
+    )
     channel_id, channel_title = await _resolve_channel(settings.database_path, channel_slug)
     if channel_id is None:
         await callback.message.answer(

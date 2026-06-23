@@ -10,7 +10,13 @@ from zoneinfo import ZoneInfo
 
 from app.access import reject_message_if_not_allowed, reject_message_if_not_owner
 from app.storage.authorized_users import add_authorized_user, list_authorized_users
-from app.storage.channels import get_channel, list_channels, set_channel_enabled
+from app.storage.channels import (
+    get_channel,
+    list_channel_memory,
+    list_channels,
+    mark_channel_left_by_adeus,
+)
+from app.services.channel_recovery import collect_channel_candidates, recover_channels
 from app.services.discovery_scheduler import (
     GNEWS_DAILY_BUDGET,
     auto_cycles_remaining_today,
@@ -78,7 +84,10 @@ async def help_command(message: Message) -> None:
         "/pfr ID — reabrir post 'failed' como rascunho\n"
         "/buscar — pedir uma notícia agora (escolhe a trilha, gera a prévia, botão ⏭ Próxima para descartar e pedir outra)\n\n"
         "<b>Canais</b>\n"
-        "/pc — listar canais detectados (o bot aparece aqui ao virar admin de um canal)\n"
+        "/pc — listar canais ativos\n"
+        "/pclab — hipóteses de canais por evidência do banco\n"
+        "/pcmemoria — memória de canais usados/desativados\n"
+        "/pcrecuperar [ID|todos] — testar e restaurar com o mesmo token\n"
         "/adeus ID — sair de um canal pelo ID (só o dono)\n\n"
         "<b>Reações de posts</b>\n"
         "• Todo post de canal visto pelo bot admin entra em monitoramento automático.\n"
@@ -152,26 +161,147 @@ async def channels_command(message: Message) -> None:
         return
 
     settings = get_settings()
+    # /pc faz apenas prova passiva. Não envia mensagem-teste no canal.
+    await recover_channels(
+        message.bot,
+        settings.database_path,
+        env_chat_ids=_env_channel_ids(),
+        active_probe=False,
+        limit=50,
+    )
     channels = await list_channels(settings.database_path)
     if not channels:
         await message.answer(
             "<b>Canais</b>\n\n"
-            "Nenhum canal detectado ainda.\n"
-            "Adicione o bot como <b>administrador</b> em um canal — ele aparece "
-            "aqui automaticamente, já com o nome real."
+            "Nenhum canal ativo depois da prova passiva.\n"
+            "Use <code>/pclab</code> para ver hipóteses históricas e "
+            "<code>/pcrecuperar ID</code> para testar com o token."
         )
         return
 
     lines = "\n".join(
         f"• <code>{c['chat_id']}</code> — {html.escape(c['title'])}"
         + (f" (@{html.escape(c['username'])})" if c.get("username") else "")
+        + (f" · <code>{html.escape(c.get('last_access_state') or 'ativo')}</code>" if c.get("last_access_state") else "")
         for c in channels
     )
     await message.answer(
         "<b>Canais disponíveis para publicar</b>\n\n"
         f"{lines}\n\n"
-        "Use <code>/adeus ID</code> para fazer o bot sair de um canal.\n"
-        "Promova o bot a administrador em outros canais para que apareçam aqui."
+        "Use <code>/pclab</code> para ver hipóteses históricas e "
+        "<code>/pcrecuperar ID</code> para testar restauração.\n"
+        "Use <code>/adeus ID</code> para fazer o bot sair de um canal."
+    )
+
+
+def _env_channel_ids() -> list[int | None]:
+    settings = get_settings()
+    return [settings.channel_1_id, settings.channel_2_id]
+
+
+@router.message(Command("pclab"))
+async def channel_lab_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    settings = get_settings()
+    parts = (message.text or "").split()
+    only_chat_id = None
+    if len(parts) >= 2 and parts[1].lower() not in {"todos", "all", "*"}:
+        try:
+            only_chat_id = int(parts[1])
+        except ValueError:
+            await message.answer("ID inválido. Use <code>/pclab -100...</code> ou <code>/pclab todos</code>.")
+            return
+
+    candidates = await collect_channel_candidates(
+        settings.database_path,
+        env_chat_ids=_env_channel_ids(),
+        only_chat_id=only_chat_id,
+    )
+    if not candidates:
+        await message.answer("<b>Laboratório de canais</b>\n\nNenhuma hipótese encontrada no banco.")
+        return
+
+    lines = []
+    for item in candidates[:25]:
+        title = html.escape(item.title or str(item.chat_id))
+        lines.append(
+            f"• <code>{item.chat_id}</code> — <b>{title}</b>\n"
+            f"  score: <code>{item.score}</code> · evidências: {html.escape(item.evidence_label)}"
+        )
+    await message.answer(
+        "<b>Laboratório de canais</b>\n\n"
+        "Personalidade científica do pCurator: hipótese → evidência → prova com token.\n\n"
+        + "\n".join(lines)
+        + "\n\nUse <code>/pcrecuperar ID</code> para testar uma hipótese com o token."
+    )
+
+
+@router.message(Command("pcmemoria"))
+async def channel_memory_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    settings = get_settings()
+    rows = await list_channel_memory(settings.database_path)
+    if not rows:
+        await message.answer("<b>Memória de canais</b>\n\nNenhum canal registrado ainda.")
+        return
+
+    lines = []
+    for row in rows[:30]:
+        title = html.escape(row.get("title") or str(row["chat_id"]))
+        enabled = "ativo" if row.get("is_enabled") else "inativo"
+        adeus = " · adeus" if row.get("left_by_adeus") else ""
+        state = html.escape(row.get("last_access_state") or "sem estado")
+        reason = html.escape((row.get("last_access_reason") or "")[:180])
+        lines.append(
+            f"• <code>{row['chat_id']}</code> — <b>{title}</b>\n"
+            f"  {enabled}{adeus} · estado: <code>{state}</code>\n"
+            f"  {reason}"
+        )
+    await message.answer("<b>Memória de canais</b>\n\n" + "\n".join(lines))
+
+
+@router.message(Command("pcrecuperar"))
+async def channel_recover_command(message: Message) -> None:
+    if await reject_message_if_not_owner(message):
+        return
+
+    settings = get_settings()
+    parts = (message.text or "").split()
+    only_chat_id: int | None = None
+    active_probe = True
+
+    if len(parts) >= 2 and parts[1].lower() not in {"todos", "all", "*"}:
+        try:
+            only_chat_id = int(parts[1])
+        except ValueError:
+            await message.answer("Uso: <code>/pcrecuperar ID</code> ou <code>/pcrecuperar todos</code>.")
+            return
+    if any(p.lower() in {"seco", "dry", "passivo"} for p in parts[1:]):
+        active_probe = False
+
+    results = await recover_channels(
+        message.bot,
+        settings.database_path,
+        env_chat_ids=_env_channel_ids(),
+        only_chat_id=only_chat_id,
+        active_probe=active_probe,
+        limit=25,
+    )
+    if not results:
+        await message.answer("<b>Recuperação de canais</b>\n\nNenhuma hipótese encontrada para testar.")
+        return
+
+    restored = sum(1 for r in results if r.restored)
+    lines = [r.line() for r in results]
+    mode = "prova ativa send/delete" if active_probe else "prova passiva"
+    await message.answer(
+        f"<b>Recuperação de canais</b>\n\n"
+        f"Modo: <code>{html.escape(mode)}</code> · restaurados: <code>{restored}</code>/<code>{len(results)}</code>\n\n"
+        + "\n\n".join(lines[:20])
     )
 
 
@@ -221,7 +351,13 @@ async def leave_channel_command(message: Message) -> None:
         )
         return
 
-    await set_channel_enabled(settings.database_path, chat_id, False)
+    await mark_channel_left_by_adeus(
+        settings.database_path,
+        chat_id,
+        title=(channel or {}).get("title") if channel else None,
+        username=(channel or {}).get("username") if channel else None,
+        reason="/adeus executou send_message('pCurator off') e leave_chat com sucesso",
+    )
 
     title = channel.get("title") if channel else None
     title_line = f"Canal: {html.escape(title)}\n" if title else ""
@@ -229,7 +365,8 @@ async def leave_channel_command(message: Message) -> None:
         "👋 Bot saiu do canal com sucesso.\n"
         f"{title_line}"
         f"ID: <code>{chat_id}</code>\n\n"
-        "O canal também foi desativado na lista local."
+        "A memória histórica foi preservada. Use <code>/pclab</code> e "
+        "<code>/pcrecuperar ID</code> para testar se o mesmo token ainda consegue restaurar."
     )
 
 

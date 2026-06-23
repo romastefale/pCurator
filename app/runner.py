@@ -8,32 +8,37 @@ from aiogram.enums import ParseMode
 from app.app_factory import create_dispatcher
 from app.services.discovery_scheduler import discovery_loop
 from app.settings import Settings, get_settings
-from app.storage.channels import upsert_channel
+from app.services.channel_recovery import recover_channels
 from app.storage.database import init_db
 
 logger = logging.getLogger(__name__)
 
 
 async def _seed_channels(bot: Bot, settings: Settings) -> None:
-    """Cadastra/atualiza os canais já configurados (CHANNEL_1_ID/CHANNEL_2_ID)
-    buscando o nome real via get_chat. Canais novos são detectados sozinhos
-    pelo handler de my_chat_member quando o bot vira admin."""
-    for chat_id in (settings.channel_1_id, settings.channel_2_id):
-        if not chat_id:
-            continue
-        try:
-            chat = await bot.get_chat(chat_id)
-            await upsert_channel(
-                settings.database_path,
-                chat_id=chat.id,
-                title=chat.title or str(chat.id),
-                username=chat.username,
+    """Revalida canais conhecidos no boot sem postar teste.
+
+    A fonte não é mais apenas CHANNEL_1_ID/CHANNEL_2_ID: o motor combina env,
+    tabela channels, posts publicados e tabelas de reação para recuperar
+    hipóteses de canal. No boot a prova é passiva; /pcrecuperar faz prova ativa.
+    """
+    try:
+        results = await recover_channels(
+            bot,
+            settings.database_path,
+            env_chat_ids=[settings.channel_1_id, settings.channel_2_id],
+            active_probe=False,
+            limit=50,
+        )
+        for result in results:
+            logger.info(
+                "channel_boot_probe chat_id=%s ok=%s state=%s reason=%s",
+                result.chat_id,
+                result.ok,
+                result.state,
+                result.reason,
             )
-            logger.info("channel_seeded chat_id=%s title=%s", chat.id, chat.title)
-        except Exception as exc:
-            logger.warning(
-                "channel_seed_failed chat_id=%s err=%s", chat_id, type(exc).__name__
-            )
+    except Exception as exc:
+        logger.warning("channel_boot_probe_failed err=%s", type(exc).__name__)
 
 
 async def run_polling() -> None:

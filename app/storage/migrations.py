@@ -54,6 +54,24 @@ async def apply_migrations(database_path: str) -> None:
             await db.execute("ALTER TABLE channels ADD COLUMN username TEXT")
         if "updated_at" not in channel_columns:
             await db.execute("ALTER TABLE channels ADD COLUMN updated_at TEXT")
+        for column_name, column_type in {
+            "left_by_adeus": "INTEGER NOT NULL DEFAULT 0",
+            "left_at": "TEXT",
+            "last_access_state": "TEXT",
+            "last_access_reason": "TEXT",
+            "last_verified_at": "TEXT",
+            "last_restored_at": "TEXT",
+            "recovery_score": "INTEGER NOT NULL DEFAULT 0",
+            "recovery_evidence": "TEXT",
+            "bot_member_status": "TEXT",
+            "can_post_messages": "INTEGER",
+            "can_edit_messages": "INTEGER",
+            "can_delete_messages": "INTEGER",
+            "last_probe_message_id": "INTEGER",
+            "last_probe_at": "TEXT",
+        }.items():
+            if column_name not in channel_columns:
+                await db.execute(f"ALTER TABLE channels ADD COLUMN {column_name} {column_type}")
         # Desduplica por chat_id antes do índice UNIQUE: mantém o rowid mais alto
         # (linha mais recente) por chat_id, senão o CREATE INDEX falharia em bases
         # antigas com duplicatas e travaria o startup.
