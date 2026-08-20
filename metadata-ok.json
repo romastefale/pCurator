@@ -1,0 +1,15 @@
+{
+    "name": "Biometric Palm Identity NFT #1",
+    "description": "NFT representativo de identidade biométrica baseada no padrão de linhas da palma da mão.",
+    "image": "ipfs://bafybeidups7mvxepxdmywj4mjtny2counnkvtt7qjl5w4av3wjzoserayi",
+    "attributes": [
+        {
+            "trait_type": "Biometric Hash (SHA-256)",
+            "value": "4d43e5904d161a0f5a70d85918733226a2694705007358e244b82d4957e84d9f"
+        },
+        {
+            "trait_type": "Verification Type",
+            "value": "Palm Line Extraction"
+        }
+    ]
+}
